@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Annotations</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ===== Toolbar ===== -->
+  <header id="toolbar">
+    <label class="file-btn" title="Open a local PDF">
+      <span>Open PDF</span>
+      <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden />
+    </label>
+
+    <div class="pdf-name" id="pdfName">No PDF loaded</div>
+
+    <div class="spacer"></div>
+
+    <div class="nav-group" id="navGroup" hidden>
+      <button id="prevPage" title="Previous page">◀</button>
+      <span class="page-indicator">
+        <input type="number" id="pageInput" min="1" value="1" />
+        / <span id="pageCount">1</span>
+      </span>
+      <button id="nextPage" title="Next page">▶</button>
+    </div>
+
+    <div class="zoom-group" id="zoomGroup" hidden>
+      <button id="zoomOut" title="Zoom out">−</button>
+      <span id="zoomLevel">100%</span>
+      <button id="zoomIn" title="Zoom in">+</button>
+    </div>
+
+    <div class="data-group" id="dataGroup" hidden>
+      <button id="exportBtn" title="Export annotations to JSON">Export</button>
+      <label class="file-btn small" title="Import annotations from JSON">
+        <span>Import</span>
+        <input type="file" id="importInput" accept="application/json,.json" hidden />
+      </label>
+    </div>
+  </header>
+
+  <!-- ===== Main layout ===== -->
+  <main id="main">
+    <!-- PDF viewer -->
+    <section id="viewer" tabindex="0">
+      <div id="emptyState" class="empty-state">
+        <h2>Open a PDF to begin</h2>
+        <p>Select text to highlight it and add annotations.</p>
+        <p class="hint">Everything runs locally in your browser — no upload, works offline.</p>
+      </div>
+      <div id="pagesContainer"></div>
+    </section>
+
+    <!-- Annotations side panel -->
+    <aside id="sidePanel">
+      <div class="panel-header">
+        <h2>Annotations</h2>
+        <span id="annotationCount" class="count">0</span>
+      </div>
+      <input type="text" id="searchBox" placeholder="Search annotations…" hidden />
+      <ul id="annotationList" class="annotation-list"></ul>
+      <div id="emptyAnnotations" class="empty-annotations">
+        No annotations yet. Select text in the PDF and click <strong>Highlight</strong>.
+      </div>
+    </aside>
+  </main>
+
+  <!-- Floating highlight button (appears near a text selection) -->
+  <button id="highlightBtn" class="highlight-btn" hidden>Highlight</button>
+
+  <!-- Highlight editor popover -->
+  <div id="editorPopover" class="editor-popover" hidden>
+    <textarea id="editorText" placeholder="Add a note (optional)…"></textarea>
+    <div class="editor-actions">
+      <button id="editorDelete" class="danger">Delete</button>
+      <button id="editorSave" class="primary">Save</button>
+    </div>
+  </div>
+
+  <!-- Toast for feedback -->
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- ===== Scripts (classic, load order matters) ===== -->
+  <script src="lib/pdf.min.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/pdf-viewer.js"></script>
+  <script src="js/highlighter.js"></script>
+  <script src="js/annotations-ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

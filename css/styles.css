@@ -1,0 +1,339 @@
+/* ============================================================
+   PDF Annotations — styles
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+:root {
+  --bg: #1e1e2e;
+  --bg-panel: #252537;
+  --bg-elev: #2d2d44;
+  --border: #3a3a55;
+  --text: #e6e6f0;
+  --text-dim: #9a9ab5;
+  --accent: #7c5cff;
+  --accent-hover: #6a4aef;
+  --danger: #e5484d;
+  --highlight: #ffd400;
+  --highlight-soft: rgba(255, 212, 0, 0.35);
+  --ok: #30a46c;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+button:hover { background: var(--accent); border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); }
+button.primary:hover { background: var(--accent-hover); }
+button.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+button.danger:hover { background: var(--danger); color: #fff; }
+
+/* ===== Toolbar ===== */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+}
+.file-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.file-btn:hover { background: var(--accent-hover); }
+.file-btn.small { background: var(--bg-elev); border-color: var(--border); font-weight: 400; }
+.file-btn.small:hover { background: var(--accent); border-color: var(--accent); }
+
+.pdf-name {
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spacer { flex: 1; }
+
+.nav-group, .zoom-group, .data-group { display: flex; align-items: center; gap: 6px; }
+.page-indicator { display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
+#pageInput { width: 42px; text-align: center; padding: 4px; border-radius: 4px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+#zoomLevel { min-width: 44px; text-align: center; color: var(--text-dim); }
+
+/* ===== Main layout ===== */
+#main {
+  display: flex;
+  height: calc(100% - 52px);
+}
+
+#viewer {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: #181825;
+}
+#viewer:focus { outline: none; }
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.empty-state h2 { color: var(--text); margin: 0 0 8px; }
+.empty-state .hint { font-size: 12px; opacity: 0.7; margin-top: 16px; }
+
+#pagesContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+/* ===== Page wrapper (canvas + highlight layer + text layer) ===== */
+.page-wrapper {
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  background: #fff;
+  line-height: 1;
+}
+.page-wrapper canvas { display: block; }
+
+.highlight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 3;
+}
+.highlight-rect {
+  position: absolute;
+  background: var(--highlight-soft);
+  border: 1px solid rgba(255, 212, 0, 0.6);
+  border-radius: 1px;
+  pointer-events: auto;
+  cursor: pointer;
+  mix-blend-mode: multiply;
+}
+.highlight-rect.has-note {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.highlight-rect.flash {
+  animation: flash 0.9s ease-out;
+}
+@keyframes flash {
+  0% { background: rgba(124, 92, 255, 0.7); }
+  100% { background: var(--highlight-soft); }
+}
+
+/* ===== PDF.js text layer (transparent selectable text) ===== */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 1;
+  line-height: 1;
+  forced-color-adjust: none;
+  z-index: 2;
+}
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer ::selection {
+  background: rgba(124, 92, 255, 0.35);
+}
+/* mark elements are used by PDF.js in some versions; keep transparent */
+.textLayer mark { color: transparent; background: transparent; }
+
+/* ===== Side panel ===== */
+#sidePanel {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-header h2 { margin: 0; font-size: 15px; }
+.count {
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+#searchBox {
+  margin: 10px 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.annotation-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.annotation-item {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.annotation-item:hover { border-color: var(--accent); }
+.annotation-item .meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.annotation-item .page-tag {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+.annotation-item .selected-text {
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  border-left: 3px solid var(--highlight);
+  padding-left: 8px;
+  margin-bottom: 6px;
+}
+.annotation-item .note-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 6px;
+}
+.empty-annotations {
+  padding: 20px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ===== Floating highlight button ===== */
+.highlight-btn {
+  position: fixed;
+  z-index: 50;
+  background: var(--highlight);
+  color: #1a1a1a;
+  border: none;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+}
+.highlight-btn:hover { background: #ffdf33; }
+
+/* ===== Editor popover ===== */
+.editor-popover {
+  position: fixed;
+  z-index: 60;
+  width: 280px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.editor-popover textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ok);
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  z-index: 100;
+  font-size: 13px;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
