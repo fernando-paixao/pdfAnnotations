@@ -46,6 +46,7 @@ pdfAnnotations/
 │   ├── app.js              # Bootstrap, wires modules together, event hub
 │   ├── pdf-viewer.js       # Load PDF, render pages (canvas + text layer), zoom/nav
 │   ├── highlighter.js      # Capture text selection, draw/re-draw highlight overlays
+│   ├── search.js           # Full-PDF text search (find, navigate, match overlays)
 │   ├── storage.js          # IndexedDB wrapper (annotations + pdf metadata)
 │   └── annotations-ui.js   # Side panel list, add/edit/delete notes, export/import
 ├── lib/
@@ -126,6 +127,11 @@ Each page is a container holding three stacked layers:
 5. **Zoom**: re-render canvas + text layer at new scale; highlights re-scale from
    normalized rects (no re-capture needed).
 6. **Export/Import**: download JSON for current `pdfId` / upload JSON to merge.
+7. **Find in PDF** (full-text search): type in the toolbar search box → builds a per-page
+   text index from `getTextContent` → matches across the whole document → draws match
+   overlays (active match highlighted) + prev/next navigation (`Enter`/`Shift+Enter`),
+   `Ctrl+F` to focus, `Esc` to clear. Matches are recomputed from text-item geometry so
+   they stay correct after zoom.
 
 ## Step-by-Step TODO List
 1. Download PDF.js v3.11.174 prebuilt files into `lib/` (`pdf.min.js`, `pdf.worker.min.js`).

@@ -24,6 +24,9 @@
   const pageCount = $('pageCount');
   const zoomLevel = $('zoomLevel');
   const searchBox = $('searchBox');
+  const searchGroup = $('searchGroup');
+  const pdfSearch = $('pdfSearch');
+  const searchCount = $('searchCount');
   const toastEl = $('toast');
 
   // ---------- Helpers ----------
@@ -54,6 +57,7 @@
 
   PDFViewer.callbacks.onPageRendered = (pageNumber) => {
     Highlighter.redrawPage(pageNumber);
+    Search.redrawPage(pageNumber);
   };
   PDFViewer.callbacks.onVisiblePageChange = (n) => {
     currentPage = n;
@@ -103,6 +107,20 @@
     showToast('Annotation deleted');
   };
 
+  // ---------- Search (Find in PDF) ----------
+  Search.init(pdfSearch, searchCount, $('searchPrev'), $('searchNext'), $('searchClear'));
+
+  // Ctrl+F focuses the search box
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      if (!searchGroup.hidden) {
+        e.preventDefault();
+        pdfSearch.focus();
+        pdfSearch.select();
+      }
+    }
+  });
+
   // ---------- Load PDF ----------
   async function loadPdfFile(file) {
     if (!file) return;
@@ -119,6 +137,7 @@
       Highlighter.clear();
       Highlighter.setPdfId(pdfId);
       Highlighter.setAnnotations(currentAnnotations);
+      Search.reset();
       refreshUI();
 
       // 2) Render the PDF
@@ -131,6 +150,7 @@
       navGroup.hidden = false;
       zoomGroup.hidden = false;
       dataGroup.hidden = false;
+      searchGroup.hidden = false;
       zoomLevel.textContent = Math.round(PDFViewer.getScale() * 100) + '%';
       await Storage.savePdfMeta({
         pdfId, fileName: file.name, numPages: PDFViewer.getNumPages(), lastOpened: Date.now(),

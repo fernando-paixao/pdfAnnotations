@@ -89,6 +89,25 @@ button.danger:hover { background: var(--danger); color: #fff; }
   background: var(--bg); color: var(--text); border: 1px solid var(--border); }
 #zoomLevel { min-width: 44px; text-align: center; color: var(--text-dim); }
 
+.search-group { display: flex; align-items: center; gap: 4px; }
+#pdfSearch {
+  width: 190px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+#pdfSearch:focus { outline: none; border-color: var(--accent); }
+.search-count {
+  min-width: 46px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.search-group button { padding: 6px 8px; }
+
 /* ===== Main layout ===== */
 #main {
   display: flex;
@@ -160,6 +179,19 @@ button.danger:hover { background: var(--danger); color: #fff; }
 @keyframes flash {
   0% { background: rgba(124, 92, 255, 0.7); }
   100% { background: var(--highlight-soft); }
+}
+
+/* Search match overlays (drawn into the highlight-layer) */
+.search-match {
+  position: absolute;
+  background: rgba(124, 92, 255, 0.28);
+  border-radius: 1px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.search-match-active {
+  background: rgba(124, 92, 255, 0.55);
+  outline: 1px solid var(--accent);
 }
 
 /* ===== PDF.js text layer (transparent selectable text) ===== */

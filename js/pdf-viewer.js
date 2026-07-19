@@ -15,6 +15,7 @@ const PDFViewer = (() => {
   let currentGen = 0;
   let observer = null;
   let dpr = window.devicePixelRatio || 1;
+  let textContentCache = []; // 1-indexed: cached getTextContent results
 
   // External callbacks
   const callbacks = {
@@ -50,6 +51,7 @@ const PDFViewer = (() => {
     pageWrappers = new Array(numPages + 1);
     pageViewports = new Array(numPages + 1);
     renderedGen = new Array(numPages + 1).fill(0);
+    textContentCache = new Array(numPages + 1);
 
     // Fetch base viewports (cheap; no rendering) for correct placeholder sizes
     for (let i = 1; i <= numPages; i++) {
@@ -142,6 +144,7 @@ const PDFViewer = (() => {
 
       // Text layer (transparent, selectable)
       const textContent = await page.getTextContent();
+      textContentCache[pageNumber] = textContent; // cache for search
       if (myGen !== currentGen) return;
       // Clear previous text layer content (on re-render)
       textLayerDiv.innerHTML = '';
@@ -220,11 +223,25 @@ const PDFViewer = (() => {
   function getPageWrapper(n) { return pageWrappers[n] || null; }
   function getNumPages() { return numPages; }
 
+  // Cached text content for a page (fetches if not rendered yet) — used by search
+  async function getTextContent(pageNumber) {
+    if (textContentCache[pageNumber]) return textContentCache[pageNumber];
+    if (!pdfDoc) return null;
+    const page = await pdfDoc.getPage(pageNumber);
+    const tc = await page.getTextContent();
+    textContentCache[pageNumber] = tc;
+    return tc;
+  }
+
+  // Base viewport (scale 1) for coordinate conversion
+  function getBaseViewport(pageNumber) { return pageViewports[pageNumber] || null; }
+
   return {
     init,
     loadArrayBuffer,
     setScale, zoomIn, zoomOut, getScale,
     goToPage, getNumPages, getPageWrapper,
+    getTextContent, getBaseViewport,
     renderPage,
     callbacks,
   };
