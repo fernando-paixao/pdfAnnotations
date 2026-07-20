@@ -91,6 +91,7 @@ const Ollama = (() => {
       numCtx: body.options.num_ctx,
       messageCount: body.messages.length,
       requestLength: JSON.stringify(body.messages).length,
+      requestBody: JSON.stringify(body, null, 2),
       responseLength: responseText.length,
       timeToFirstTokenMs: Math.round(firstTokenMs),
       totalTimeMs: Math.round(endTime - startTime),

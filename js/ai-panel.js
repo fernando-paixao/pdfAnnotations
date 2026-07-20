@@ -14,6 +14,7 @@ const AIPanel = (() => {
     numCtx: 8192,
     reasoning: false,
     streaming: true,
+    systemPrompt: '',
     contextScope: 'entirePage',
     pageCount: 1,
     promptTemplate: 'Summarize the key points of the following text:\n\n$text',
@@ -66,6 +67,7 @@ const AIPanel = (() => {
     els.numCtx = $('aiNumCtx');
     els.reasoning = $('aiReasoning');
     els.streaming = $('aiStreaming');
+    els.systemPrompt = $('aiSystemPrompt');
     els.promptTemplate = $('aiPromptTemplate');
     els.contextScope = $('aiContextScope');
     els.pageCount = $('aiPageCount');
@@ -96,6 +98,7 @@ const AIPanel = (() => {
     els.numCtx.value = settings.numCtx;
     els.reasoning.checked = settings.reasoning;
     els.streaming.checked = settings.streaming;
+    els.systemPrompt.value = settings.systemPrompt;
     els.promptTemplate.value = settings.promptTemplate;
     els.contextScope.value = settings.contextScope;
     els.pageCount.value = settings.pageCount;
@@ -111,6 +114,7 @@ const AIPanel = (() => {
     settings.numCtx = parseInt(els.numCtx.value, 10) || 8192;
     settings.reasoning = els.reasoning.checked;
     settings.streaming = els.streaming.checked;
+    settings.systemPrompt = els.systemPrompt.value;
     settings.promptTemplate = els.promptTemplate.value;
     settings.contextScope = els.contextScope.value;
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
@@ -131,7 +135,7 @@ const AIPanel = (() => {
     });
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
-     els.contextScope, els.pageCount, els.autoHowMany].forEach((el) => {
+     els.systemPrompt, els.contextScope, els.pageCount, els.autoHowMany].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
     [els.reasoning, els.streaming, els.autoNotes].forEach((el) => {
@@ -246,11 +250,16 @@ const AIPanel = (() => {
     try {
       const ctx = await gatherContext();
       const prompt = settings.promptTemplate.replace(/\$text/g, ctx.text);
+      const messages = [];
+      if (settings.systemPrompt && settings.systemPrompt.trim()) {
+        messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+      }
+      messages.push({ role: 'user', content: prompt });
       els.status.textContent = 'Waiting for Ollama…';
       const result = await Ollama.chat({
         host: settings.host,
         model: settings.model,
-        messages: [{ role: 'user', content: prompt }],
+        messages,
         stream: settings.streaming,
         maxTokens: settings.maxTokens,
         numCtx: settings.numCtx,
@@ -271,6 +280,7 @@ const AIPanel = (() => {
             ' | stream=' + s.stream + ' | think=' + s.think +
             ' | maxTokens=' + s.maxTokens + ' | numCtx=' + s.numCtx +
             ' | messages=' + s.messageCount + ' | promptLen=' + s.requestLength);
+          debugLog('BODY', s.requestBody);
           debugLog('RESP', 'Response length: ' + s.responseLength + ' chars');
           debugLog('TIME', 'First token: ' + formatMs(s.timeToFirstTokenMs) +
             ' | Total: ' + formatMs(s.totalTimeMs));

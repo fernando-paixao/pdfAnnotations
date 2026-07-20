@@ -133,6 +133,12 @@
       <details class="ai-section" open>
         <summary>Prompt Template</summary>
         <div class="ai-form">
+          <details class="ai-subsection">
+            <summary>System Prompt (optional)</summary>
+            <textarea id="aiSystemPrompt" rows="3"
+              placeholder="e.g. You are a helpful assistant that analyzes PDF documents. Answer concisely."></textarea>
+            <p class="hint">Sent as a <code>role: system</code> message before your prompt.</p>
+          </details>
           <textarea id="aiPromptTemplate" rows="4"
             placeholder="Write your prompt. Use $text where the PDF context goes."></textarea>
           <p class="hint">Use <code>$text</code> as the placeholder for the PDF context.</p>

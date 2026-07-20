@@ -63,12 +63,17 @@ const AutoAnnotate = (() => {
 
       const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes);
       debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
+      const messages = [];
+      if (settings.systemPrompt && settings.systemPrompt.trim()) {
+        messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+      }
+      messages.push({ role: 'user', content: prompt });
       let raw;
       try {
         raw = await Ollama.chat({
           host: settings.host,
           model: settings.model,
-          messages: [{ role: 'user', content: prompt }],
+          messages,
           stream: false,
           maxTokens: settings.maxTokens,
           numCtx: settings.numCtx,
@@ -77,6 +82,7 @@ const AutoAnnotate = (() => {
           onStats: (s) => {
             debug('REQ', 'Page ' + pg.page + ': POST ' + s.url + ' | model=' + s.model +
               ' | promptLen=' + s.requestLength);
+            debug('BODY', 'Page ' + pg.page + ': request body', s.requestBody);
             debug('TIME', 'Page ' + pg.page + ': first token=' + s.timeToFirstTokenMs +
               'ms | total=' + s.totalTimeMs + 'ms');
           },
@@ -88,8 +94,7 @@ const AutoAnnotate = (() => {
         continue;
       }
 
-      debug('AUTO', 'Page ' + pg.page + ': raw AI response (' + raw.length + ' chars)',
-        raw.length > 500 ? raw.slice(0, 500) + '\n…[truncated]' : raw);
+      debug('AUTO', 'Page ' + pg.page + ': raw AI response (' + raw.length + ' chars)', raw);
 
       const passages = parsePassages(raw);
       debug('AUTO', 'Page ' + pg.page + ': parsed ' + passages.length + ' passage(s) from AI response');

@@ -506,6 +506,43 @@ body.ai-open .ai-backdrop {
   font-size: 11px;
 }
 
+/* Nested collapsible subsection (e.g. System Prompt) */
+.ai-subsection {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ai-subsection > summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  user-select: none;
+}
+.ai-subsection > summary:hover { color: var(--accent); }
+.ai-subsection[open] > summary { border-bottom: 1px solid var(--border); }
+.ai-subsection textarea {
+  width: 100%;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: none;
+  border-radius: 0;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+.ai-subsection textarea:focus { outline: none; }
+.ai-subsection .hint {
+  padding: 0 10px 8px;
+  margin: 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
 .ai-status {
   font-size: 12px;
   color: var(--text-dim);
@@ -680,6 +717,7 @@ body.ai-open .ai-backdrop {
   margin: 0 4px;
 }
 .debug-tag-REQ   { background: #3b5bdb; color: #fff; }
+.debug-tag-BODY  { background: #5c3b9e; color: #fff; }
 .debug-tag-RESP  { background: #2f9e44; color: #fff; }
 .debug-tag-TIME  { background: #e8590c; color: #fff; }
 .debug-tag-AUTO  { background: #9c36b5; color: #fff; }

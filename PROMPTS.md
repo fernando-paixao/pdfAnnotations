@@ -83,7 +83,10 @@ Can you add a feature optional advanced features:
 
 - System prompt: Sent as a role: system message before the user prompt when using /api/chat.
 - 
---- Future
+--- Future (niy)
 Can you add queue actions to AI, as they has some time to be answered by Ollama service the user.
 And add a sound to be played while each action queued is completed.
 ---
+Can you add a feature optional advanced features:
+
+- Let the user modify 
