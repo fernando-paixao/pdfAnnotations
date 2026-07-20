@@ -14,6 +14,7 @@ const AIPanel = (() => {
     numCtx: 8192,
     reasoning: false,
     streaming: true,
+    soundEnabled: true,
     systemPrompt: '',
     contextScope: 'entirePage',
     pageCount: 1,
@@ -27,6 +28,12 @@ const AIPanel = (() => {
   let els = {};
   let abortController = null;
   let viewMode = 'text'; // 'text' | 'markdown'
+
+  // Queue state
+  let queue = [];             // [{id, messages, label}]
+  let isProcessing = false;
+  let queueIdCounter = 0;
+  let audioCtx = null;
 
   const callbacks = {
     getCurrentPage: null,   // () => number
@@ -68,6 +75,7 @@ const AIPanel = (() => {
     els.numCtx = $('aiNumCtx');
     els.reasoning = $('aiReasoning');
     els.streaming = $('aiStreaming');
+    els.soundEnabled = $('aiSoundEnabled');
     els.systemPrompt = $('aiSystemPrompt');
     els.promptTemplate = $('aiPromptTemplate');
     els.contextScope = $('aiContextScope');
@@ -75,6 +83,8 @@ const AIPanel = (() => {
     els.pageCountWrap = $('aiPageCountWrap');
     els.send = $('aiSend');
     els.stop = $('aiStop');
+    els.queueBadge = $('aiQueueBadge');
+    els.clearQueue = $('aiClearQueue');
     els.response = $('aiResponse');
     els.responseMd = $('aiResponseMd');
     els.viewText = $('aiViewText');
@@ -101,6 +111,7 @@ const AIPanel = (() => {
     els.numCtx.value = settings.numCtx;
     els.reasoning.checked = settings.reasoning;
     els.streaming.checked = settings.streaming;
+    els.soundEnabled.checked = settings.soundEnabled;
     els.systemPrompt.value = settings.systemPrompt;
     els.promptTemplate.value = settings.promptTemplate;
     els.contextScope.value = settings.contextScope;
@@ -118,6 +129,7 @@ const AIPanel = (() => {
     settings.numCtx = parseInt(els.numCtx.value, 10) || 8192;
     settings.reasoning = els.reasoning.checked;
     settings.streaming = els.streaming.checked;
+    settings.soundEnabled = els.soundEnabled.checked;
     settings.systemPrompt = els.systemPrompt.value;
     settings.promptTemplate = els.promptTemplate.value;
     settings.contextScope = els.contextScope.value;
@@ -144,7 +156,7 @@ const AIPanel = (() => {
      els.autoTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
-    [els.reasoning, els.streaming, els.autoNotes].forEach((el) => {
+    [els.reasoning, els.streaming, els.soundEnabled, els.autoNotes].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
     els.contextScope.addEventListener('change', updatePageCountVisibility);
@@ -156,6 +168,7 @@ const AIPanel = (() => {
     });
     els.send.addEventListener('click', onSend);
     els.stop.addEventListener('click', onStop);
+    els.clearQueue.addEventListener('click', clearQueue);
     els.viewText.addEventListener('click', () => setViewMode('text'));
     els.viewMarkdown.addEventListener('click', () => setViewMode('markdown'));
     els.autoRun.addEventListener('click', onAutoRun);
@@ -240,36 +253,70 @@ const AIPanel = (() => {
     }
   }
 
-  /* ---------- Send (prompt template) ---------- */
+  /* ---------- Send (with queue) ---------- */
   async function onSend() {
     collectSettings();
     if (!settings.model) {
       els.status.textContent = '⚠️ Please set a model first.';
       return;
     }
+
+    // Gather context NOW (captures current page/selection state)
+    els.status.textContent = isProcessing
+      ? 'Queuing… (gathering context)'
+      : 'Gathering context…';
+    const ctx = await gatherContext();
+    const prompt = settings.promptTemplate.replace(/\$text/g, ctx.text);
+    const messages = [];
+    if (settings.systemPrompt && settings.systemPrompt.trim()) {
+      messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    // Build a human-readable label for this action
+    let label;
+    if (ctx.pages.length > 0) {
+      label = ctx.pages.length === 1
+        ? 'Page ' + ctx.pages[0].page
+        : 'Pages ' + ctx.pages.map((p) => p.page).join(',');
+    } else {
+      label = 'Selected text';
+    }
+
+    const item = { id: ++queueIdCounter, messages, label };
+
+    if (!isProcessing) {
+      // Execute immediately
+      processQueueItem(item);
+    } else {
+      // Add to queue
+      queue.push(item);
+      updateQueueUI();
+      els.status.textContent = 'Queued #' + item.id + ' (' + label + ') — position ' + queue.length;
+      playQueueSound();
+    }
+  }
+
+  async function processQueueItem(item) {
+    isProcessing = true;
+    els.send.disabled = false; // Stay enabled so user can queue more
+    els.send.textContent = 'Send';
+    els.stop.hidden = false;
+    updateQueueUI();
+
+    // Clear response for new item
     els.response.textContent = '';
     els.responseMd.innerHTML = '';
     els.thinking.textContent = '';
     els.thinking.hidden = true;
-    els.status.textContent = 'Gathering context…';
-    els.send.disabled = true;
-    els.send.textContent = 'Generating…';
-    els.stop.hidden = false;
 
     abortController = new AbortController();
     try {
-      const ctx = await gatherContext();
-      const prompt = settings.promptTemplate.replace(/\$text/g, ctx.text);
-      const messages = [];
-      if (settings.systemPrompt && settings.systemPrompt.trim()) {
-        messages.push({ role: 'system', content: settings.systemPrompt.trim() });
-      }
-      messages.push({ role: 'user', content: prompt });
-      els.status.textContent = 'Waiting for Ollama…';
+      els.status.textContent = 'Processing #' + item.id + ' (' + item.label + ')…';
       const result = await Ollama.chat({
         host: settings.host,
         model: settings.model,
-        messages,
+        messages: item.messages,
         stream: settings.streaming,
         maxTokens: settings.maxTokens,
         numCtx: settings.numCtx,
@@ -286,38 +333,146 @@ const AIPanel = (() => {
           els.thinking.textContent += t;
         },
         onStats: (s) => {
-          debugLog('REQ', 'POST ' + s.url + ' | model=' + s.model +
+          debugLog('REQ', '#' + item.id + ' POST ' + s.url + ' | model=' + s.model +
             ' | stream=' + s.stream + ' | think=' + s.think +
             ' | maxTokens=' + s.maxTokens + ' | numCtx=' + s.numCtx +
             ' | messages=' + s.messageCount + ' | promptLen=' + s.requestLength);
           debugLog('BODY', s.requestBody);
-          debugLog('RESP', 'Response length: ' + s.responseLength + ' chars');
-          debugLog('TIME', 'First token: ' + formatMs(s.timeToFirstTokenMs) +
+          debugLog('RESP', '#' + item.id + ' Response length: ' + s.responseLength + ' chars');
+          debugLog('TIME', '#' + item.id + ' First token: ' + formatMs(s.timeToFirstTokenMs) +
             ' | Total: ' + formatMs(s.totalTimeMs));
         },
       });
       if (!settings.streaming) els.response.textContent = result;
-      // Always sync markdown view with final result
       els.responseMd.innerHTML = Markdown.render(els.response.textContent);
-      els.status.textContent = 'Done.';
+      els.status.textContent = '✓ Done #' + item.id + ' (' + item.label + ')';
+      playCompletionSound();
     } catch (err) {
       if (err.name === 'AbortError') {
-        els.status.textContent = 'Stopped.';
+        els.status.textContent = 'Stopped #' + item.id + '.';
       } else {
-        els.status.innerHTML = '⚠️ ' + escapeHtml(err.message) +
+        els.status.innerHTML = '⚠️ #' + item.id + ' ' + escapeHtml(err.message) +
           '<br><span class="hint">If this is a CORS error, start Ollama with ' +
           '<code>OLLAMA_ORIGINS=*</code>.</span>';
+        playErrorSound();
       }
     } finally {
-      els.send.disabled = false;
-      els.send.textContent = 'Send';
-      els.stop.hidden = true;
       abortController = null;
+    }
+
+    // Process next item or finish
+    if (queue.length > 0 && !abortController) {
+      const next = queue.shift();
+      updateQueueUI();
+      processQueueItem(next);
+    } else {
+      isProcessing = false;
+      els.stop.hidden = true;
+      updateQueueUI();
     }
   }
 
   function onStop() {
     if (abortController) abortController.abort();
+    // Also clear the queue
+    if (queue.length > 0) {
+      queue = [];
+      updateQueueUI();
+    }
+  }
+
+  function clearQueue() {
+    const n = queue.length;
+    queue = [];
+    updateQueueUI();
+    if (n > 0) els.status.textContent = 'Cleared ' + n + ' queued action(s).';
+  }
+
+  function updateQueueUI() {
+    const n = queue.length;
+    if (els.queueBadge) {
+      els.queueBadge.textContent = n;
+      els.queueBadge.hidden = n === 0;
+    }
+    if (els.clearQueue) {
+      els.clearQueue.hidden = n === 0;
+    }
+  }
+
+  /* ---------- Sound (Web Audio API, no external files) ---------- */
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) { audioCtx = null; }
+    }
+    return audioCtx;
+  }
+
+  function playCompletionSound() {
+    if (!settings.soundEnabled) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    try {
+      // Pleasant two-note rising chime
+      const now = ctx.currentTime;
+      [880, 1320].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const start = now + i * 0.12;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+        osc.start(start);
+        osc.stop(start + 0.3);
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  function playQueueSound() {
+    if (!settings.soundEnabled) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    try {
+      // Short soft click
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch (e) { /* ignore */ }
+  }
+
+  function playErrorSound() {
+    if (!settings.soundEnabled) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    try {
+      // Low buzz
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.value = 220;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } catch (e) { /* ignore */ }
   }
 
   /* ---------- Auto-annotate ---------- */

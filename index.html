@@ -124,6 +124,7 @@
           <div class="row checkboxes">
             <label class="check"><input type="checkbox" id="aiReasoning" /> Reasoning</label>
             <label class="check"><input type="checkbox" id="aiStreaming" checked /> Streaming</label>
+            <label class="check"><input type="checkbox" id="aiSoundEnabled" checked /> 🔔 Sound</label>
           </div>
           <div id="aiStatus" class="ai-status"></div>
         </div>
@@ -155,6 +156,8 @@
           <div class="row">
             <button id="aiSend" class="primary">Send</button>
             <button id="aiStop" class="danger" hidden>Stop</button>
+            <button id="aiClearQueue" class="small" hidden title="Clear queued actions">Clear Queue</button>
+            <span id="aiQueueBadge" class="queue-badge" hidden title="Queued actions">0</span>
           </div>
         </div>
       </details>

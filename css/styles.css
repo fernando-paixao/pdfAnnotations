@@ -468,6 +468,24 @@ body.ai-open .ai-backdrop {
 .ai-form .row.checkboxes { gap: 16px; }
 .ai-form .row > label { flex: 1; }
 .ai-form .row > button { white-space: nowrap; }
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 .ai-form input[type="text"],
 .ai-form input[type="number"],
 .ai-form select,
