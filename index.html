@@ -48,6 +48,8 @@
         <input type="file" id="importInput" accept="application/json,.json" hidden />
       </label>
     </div>
+
+    <button id="aiToggle" class="ai-toggle" title="Toggle AI panel (local Ollama)">AI</button>
   </header>
 
   <!-- ===== Main layout ===== -->
@@ -88,6 +90,95 @@
     </div>
   </div>
 
+  <!-- ===== AI Panel (slide-in drawer) ===== -->
+  <div id="aiBackdrop" class="ai-backdrop"></div>
+  <aside id="aiPanel" class="ai-panel">
+    <div class="ai-panel-header">
+      <h2>AI Assistant</h2>
+      <span class="ai-subtitle">Local Ollama</span>
+    </div>
+
+    <div class="ai-panel-body">
+      <!-- Settings -->
+      <details class="ai-section" open>
+        <summary>Settings</summary>
+        <div class="ai-form">
+          <label>Host
+            <input type="text" id="aiHost" placeholder="http://localhost:11434" />
+          </label>
+          <label>Model
+            <div class="row">
+              <input type="text" id="aiModel" placeholder="e.g. llama3.2" />
+              <button id="aiFetchModels" class="small">Fetch Models</button>
+            </div>
+            <select id="aiModelSelect" hidden></select>
+          </label>
+          <div class="row">
+            <label>Max tokens
+              <input type="number" id="aiMaxTokens" value="2048" min="1" />
+            </label>
+            <label>Context window
+              <input type="number" id="aiNumCtx" value="8192" min="512" />
+            </label>
+          </div>
+          <div class="row checkboxes">
+            <label class="check"><input type="checkbox" id="aiReasoning" /> Reasoning</label>
+            <label class="check"><input type="checkbox" id="aiStreaming" checked /> Streaming</label>
+          </div>
+          <div id="aiStatus" class="ai-status"></div>
+        </div>
+      </details>
+
+      <!-- Prompt template -->
+      <details class="ai-section" open>
+        <summary>Prompt Template</summary>
+        <div class="ai-form">
+          <textarea id="aiPromptTemplate" rows="4"
+            placeholder="Write your prompt. Use $text where the PDF context goes."></textarea>
+          <p class="hint">Use <code>$text</code> as the placeholder for the PDF context.</p>
+          <label>Context scope
+            <select id="aiContextScope">
+              <option value="selectedText">Selected text</option>
+              <option value="entirePage" selected>Entire current page</option>
+              <option value="entirePages">Multiple pages (from current)</option>
+            </select>
+          </label>
+          <label id="aiPageCountWrap" hidden>Number of pages
+            <input type="number" id="aiPageCount" value="1" min="1" max="50" />
+          </label>
+          <div class="row">
+            <button id="aiSend" class="primary">Send</button>
+            <button id="aiStop" class="danger" hidden>Stop</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Response -->
+      <details class="ai-section" open>
+        <summary>Response</summary>
+        <div id="aiThinking" class="ai-thinking" hidden></div>
+        <div id="aiResponse" class="ai-response"></div>
+      </details>
+
+      <!-- Auto-annotate -->
+      <details class="ai-section">
+        <summary>Auto-Annotate</summary>
+        <div class="ai-form">
+          <p class="hint">AI finds the most important passages and creates highlight annotations automatically.</p>
+          <label>Desired annotations (optional)
+            <input type="number" id="aiAutoHowMany" placeholder="leave empty = AI decides" min="1" max="50" />
+          </label>
+          <label class="check"><input type="checkbox" id="aiAutoNotes" checked /> Include notes</label>
+          <div class="row">
+            <button id="aiAutoRun" class="primary">Annotate</button>
+            <button id="aiAutoStop" class="danger" hidden>Stop</button>
+          </div>
+          <div id="aiAutoStatus" class="ai-status"></div>
+        </div>
+      </details>
+    </div>
+  </aside>
+
   <!-- Toast for feedback -->
   <div id="toast" class="toast" hidden></div>
 
@@ -96,7 +187,11 @@
   <script src="js/storage.js"></script>
   <script src="js/pdf-viewer.js"></script>
   <script src="js/highlighter.js"></script>
+  <script src="js/text-geometry.js"></script>
   <script src="js/search.js"></script>
+  <script src="js/ollama.js"></script>
+  <script src="js/ai-panel.js"></script>
+  <script src="js/auto-annotate.js"></script>
   <script src="js/annotations-ui.js"></script>
   <script src="js/app.js"></script>
 </body>

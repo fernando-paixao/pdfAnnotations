@@ -369,3 +369,173 @@ button.danger:hover { background: var(--danger); color: #fff; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ============================================================
+   AI Panel (slide-in drawer)
+   ============================================================ */
+.ai-toggle {
+  background: var(--bg-elev);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+}
+.ai-toggle:hover, .ai-toggle.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ai-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 70;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.ai-panel.open ~ .ai-backdrop,
+body.ai-open .ai-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ai-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 90vw;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  z-index: 80;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 30px rgba(0,0,0,0.4);
+}
+.ai-panel.open { transform: translateX(0); }
+
+.ai-panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-panel-header h2 { margin: 0; font-size: 16px; }
+.ai-subtitle { font-size: 12px; color: var(--text-dim); }
+
+.ai-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 20px;
+}
+
+.ai-section {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.ai-section > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  user-select: none;
+}
+.ai-section > summary:hover { color: var(--accent); }
+.ai-section[open] > summary { border-bottom: 1px solid var(--border); }
+
+.ai-form {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ai-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.ai-form .row { display: flex; gap: 8px; align-items: flex-end; }
+.ai-form .row.checkboxes { gap: 16px; }
+.ai-form .row > label { flex: 1; }
+.ai-form .row > button { white-space: nowrap; }
+.ai-form input[type="text"],
+.ai-form input[type="number"],
+.ai-form select,
+.ai-form textarea {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 100%;
+}
+.ai-form textarea { resize: vertical; font-family: inherit; }
+.ai-form input:focus, .ai-form select:focus, .ai-form textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+.ai-form .check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.ai-form .check input { width: auto; }
+.ai-form button.small { padding: 6px 10px; font-size: 12px; }
+.ai-form .hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.4;
+}
+.ai-form code {
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.ai-status {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-height: 16px;
+  line-height: 1.4;
+}
+.ai-status .hint { display: block; margin-top: 4px; }
+
+.ai-response {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  min-height: 60px;
+  font-family: inherit;
+}
+.ai-response:empty::before {
+  content: 'Response will appear here.';
+  color: var(--text-dim);
+  font-style: italic;
+}
+.ai-thinking {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+  border-bottom: 1px dashed var(--border);
+  max-height: 150px;
+  overflow-y: auto;
+}

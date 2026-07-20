@@ -1,0 +1,109 @@
+/* ============================================================
+   ollama.js — fetch-based Ollama API client (no backend needed).
+   Streaming via ReadableStream, cancellation via AbortController.
+   Exposes global: Ollama
+   ============================================================ */
+const Ollama = (() => {
+  const DEFAULT_HOST = 'http://localhost:11434';
+
+  /**
+   * List available models from the OpenAI-compatible endpoint.
+   * @returns {Promise<string[]>} model ids
+   */
+  async function listModels(host) {
+    const base = (host || DEFAULT_HOST).trim().replace(/\/+$/, '');
+    const url = base + '/v1/models';
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error('Ollama listModels error ' + res.status + ': ' + body);
+    }
+    const data = await res.json();
+    return (data.data || []).map((m) => m.id);
+  }
+
+  /**
+   * Send a chat request to Ollama.
+   * @param {Object} opts
+   * @param {string} opts.host
+   * @param {string} opts.model
+   * @param {Array<{role:string,content:string}>} opts.messages
+   * @param {boolean} opts.stream
+   * @param {number} opts.maxTokens  (num_predict)
+   * @param {number} opts.numCtx
+   * @param {boolean} opts.think     (reasoning)
+   * @param {function(string):void} [opts.onChunk]     called per content delta
+   * @param {function(string):void} [opts.onThinking]  called per thinking delta
+   * @param {AbortSignal} [opts.signal]
+   * @returns {Promise<string>} full response text
+   */
+  async function chat(opts) {
+    const host = (opts.host || DEFAULT_HOST).trim().replace(/\/+$/, '');
+    const url = host + '/api/chat';
+    const body = {
+      model: opts.model,
+      messages: opts.messages,
+      stream: opts.stream !== false,
+      think: !!opts.think,
+      options: {
+        num_predict: opts.maxTokens || 2048,
+        num_ctx: opts.numCtx || 8192,
+      },
+      format: opts.format || undefined,
+    };
+    // Remove undefined keys
+    if (!opts.format) delete body.format;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error('Ollama error ' + res.status + ': ' + text);
+    }
+
+    if (opts.stream !== false) {
+      return readStream(res, opts);
+    }
+    // Non-streaming: single JSON object
+    const json = await res.json();
+    if (json.thinking && opts.onThinking) opts.onThinking(json.thinking);
+    return (json.message && json.message.content) || '';
+  }
+
+  async function readStream(res, opts) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let full = '';
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      // Process complete NDJSON lines
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line) continue;
+        let chunk;
+        try { chunk = JSON.parse(line); } catch (e) { continue; }
+        if (chunk.thinking && opts.onThinking) opts.onThinking(chunk.thinking);
+        const content = (chunk.message && chunk.message.content) || '';
+        if (content) {
+          full += content;
+          if (opts.onChunk) opts.onChunk(content);
+        }
+      }
+    }
+    return full;
+  }
+
+  return { listModels, chat, DEFAULT_HOST };
+})();

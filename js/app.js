@@ -121,6 +121,71 @@
     }
   });
 
+  // ---------- Shared annotation creation helper ----------
+  async function createAnnotationRecord(data) {
+    const now = Date.now();
+    const ann = { ...data, id: uuid(), createdAt: now, updatedAt: now };
+    await Storage.addAnnotation(ann);
+    currentAnnotations.push(ann);
+    return ann;
+  }
+
+  // ---------- Page text helper (for AI context) ----------
+  async function getPageText(pageNumber) {
+    const tc = await PDFViewer.getTextContent(pageNumber);
+    if (!tc) return '';
+    const idx = TextGeometry.buildIndex(tc);
+    return idx.full;
+  }
+
+  // ---------- AI Panel ----------
+  const aiPanel = $('aiPanel');
+  const aiBackdrop = $('aiBackdrop');
+  const aiToggle = $('aiToggle');
+  AIPanel.init(aiPanel, aiToggle);
+
+  AIPanel.callbacks.getCurrentPage = () => currentPage;
+  AIPanel.callbacks.getSelectedText = () => {
+    const sel = window.getSelection();
+    return sel ? sel.toString().trim() : '';
+  };
+  AIPanel.callbacks.getPageText = getPageText;
+  AIPanel.callbacks.onAutoAnnotate = (opts) => {
+    if (opts.abort) { AutoAnnotate.abort(); return; }
+    AutoAnnotate.setPdfId(currentPdfId);
+    AutoAnnotate.run(opts);
+  };
+
+  // Backdrop click closes the panel
+  aiBackdrop.addEventListener('click', () => {
+    aiPanel.classList.remove('open');
+    aiToggle.classList.remove('active');
+    document.body.classList.remove('ai-open');
+  });
+  // Update backdrop when panel toggles
+  const aiToggleObserver = new MutationObserver(() => {
+    const open = aiPanel.classList.contains('open');
+    document.body.classList.toggle('ai-open', open);
+    aiBackdrop.style.pointerEvents = open ? 'auto' : 'none';
+    aiBackdrop.style.opacity = open ? '1' : '0';
+  });
+  aiToggleObserver.observe(aiPanel, { attributes: true, attributeFilter: ['class'] });
+
+  // ---------- Auto-Annotate ----------
+  AutoAnnotate.callbacks.getSettings = () => AIPanel.getSettings();
+  AutoAnnotate.callbacks.createAnnotation = createAnnotationRecord;
+  AutoAnnotate.callbacks.onAnnotationCreated = (ann) => {
+    Highlighter.drawAnnotation(ann);
+  };
+  AutoAnnotate.callbacks.onProgress = (msg) => AIPanel.setAutoStatus(msg);
+  AutoAnnotate.callbacks.onError = (msg) => AIPanel.setAutoStatus('⚠️ ' + msg);
+  AutoAnnotate.callbacks.onComplete = ({ created, skipped, total }) => {
+    AIPanel.setAutoStatus('Done: ' + created + ' created, ' + skipped + ' unmatched (of ' + total + ').');
+    AIPanel.setAutoDone();
+    refreshUI();
+    showToast('AI created ' + created + ' annotation(s)');
+  };
+
   // ---------- Load PDF ----------
   async function loadPdfFile(file) {
     if (!file) return;

@@ -39,3 +39,36 @@ A couple of notes flagged in the plan:
 Opening via file:// works (PDF.js falls back to main-thread worker if blocked), but a simple local server (e.g. npx serve) gives best performance.
 Pages render lazily on scroll for large PDFs.
 ---
+Now I want a resource to call local Ollama AI service:
+
+The prompt will be an textarea template text with placeholder using $ notation: $text
+This $text will be replaced by the PDF context, options: selectedText, entirePage(s) (user will decide the amount since the actual page)
+
+Other feature will be create annotations automatically on the selected page(s) since the actual page, the prompt to AI will be to find the more important parts of that page content creating annotations. Options: howManyDesiredAnnotations (nullable)
+--- Future
+Other placeholder will be $annotation (w)
+--- Plan
+I've written the Ollama integration plan to plans/ollama-integration-plan.md. Here's the summary:
+
+Plan Summary
+Two AI features, calling local Ollama directly from the browser via fetch (same API as your Tauri app, minus the Rust CORS bypass):
+
+Feature 1: AI Prompt Panel
+Collapsible drawer with Ollama settings (host, model + fetch-models dropdown, maxTokens, numCtx, reasoning, streaming) — persisted in localStorage.
+Prompt template textarea with $text placeholder.
+Context scope selector: selectedText / entirePage / entirePages (current page + N pages).
+Streams the response into a response area (with dimmed thinking section).
+Feature 2: Auto-Annotate
+AI analyzes page content and returns strict JSON of important passages.
+User options: howManyDesiredAnnotations (nullable — AI decides if empty) and includeNotes (checkbox — snippets only vs snippets + notes).
+Each AI snippet is fuzzy-matched back to the page text → converted to normalized rects → creates highlight annotations with notes as annotationText.
+New modules
+js/ollama.js — fetch-based client (listModels, streaming chat via ReadableStream, AbortController cancel)
+js/ai-panel.js — panel UI, settings, context gathering, $text substitution
+js/auto-annotate.js — JSON prompt, fuzzy matching, auto-create annotations
+js/text-geometry.js — shared text→rect helper (refactored from Search)
+⚠️ Key requirement: CORS
+Since there's no Rust backend, Ollama must be started with OLLAMA_ORIGINS=* (documented in README + shown as an error hint in the UI if the connection fails).
+
+9-step todo list covering: ollama client → HTML → CSS → AI panel → text-geometry refactor → auto-annotate → wiring → README → testing.
+---
