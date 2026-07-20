@@ -20,6 +20,7 @@ const AIPanel = (() => {
     promptTemplate: 'Summarize the key points of the following text:\n\n$text',
     includeNotes: true,
     howManyAnnotations: '',
+    autoAnnotateTemplate: '',
   };
 
   let settings = { ...DEFAULT_SETTINGS };
@@ -82,6 +83,8 @@ const AIPanel = (() => {
     els.status = $('aiStatus');
     els.autoHowMany = $('aiAutoHowMany');
     els.autoNotes = $('aiAutoNotes');
+    els.autoTemplate = $('aiAutoTemplate');
+    els.autoResetTpl = $('aiAutoResetTpl');
     els.autoRun = $('aiAutoRun');
     els.autoStop = $('aiAutoStop');
     els.autoStatus = $('aiAutoStatus');
@@ -104,6 +107,7 @@ const AIPanel = (() => {
     els.pageCount.value = settings.pageCount;
     els.autoHowMany.value = settings.howManyAnnotations;
     els.autoNotes.checked = settings.includeNotes;
+    els.autoTemplate.value = settings.autoAnnotateTemplate || AutoAnnotate.DEFAULT_AUTO_PROMPT;
     updatePageCountVisibility();
   }
 
@@ -120,6 +124,7 @@ const AIPanel = (() => {
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
     settings.howManyAnnotations = els.autoHowMany.value.trim();
     settings.includeNotes = els.autoNotes.checked;
+    settings.autoAnnotateTemplate = els.autoTemplate.value;
     saveSettings();
   }
 
@@ -135,7 +140,8 @@ const AIPanel = (() => {
     });
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
-     els.systemPrompt, els.contextScope, els.pageCount, els.autoHowMany].forEach((el) => {
+     els.systemPrompt, els.contextScope, els.pageCount, els.autoHowMany,
+     els.autoTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
     [els.reasoning, els.streaming, els.autoNotes].forEach((el) => {
@@ -154,6 +160,10 @@ const AIPanel = (() => {
     els.viewMarkdown.addEventListener('click', () => setViewMode('markdown'));
     els.autoRun.addEventListener('click', onAutoRun);
     els.autoStop.addEventListener('click', onAutoStop);
+    els.autoResetTpl.addEventListener('click', () => {
+      els.autoTemplate.value = AutoAnnotate.DEFAULT_AUTO_PROMPT;
+      collectSettings();
+    });
     els.debugClear.addEventListener('click', clearDebug);
   }
 
@@ -331,6 +341,7 @@ const AIPanel = (() => {
         callbacks.onAutoAnnotate({
           howMany: howMany && howMany > 0 ? howMany : null,
           includeNotes: settings.includeNotes,
+          promptTemplate: settings.autoAnnotateTemplate,
           pages: ctx.pages,
         });
       }

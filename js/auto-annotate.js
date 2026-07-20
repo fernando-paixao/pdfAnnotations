@@ -16,6 +16,24 @@ const AutoAnnotate = (() => {
     onDebug: null,          // (category, message, data?)
   };
 
+  // Default prompt template with placeholders:
+  //   $howMany    — instruction for number of passages
+  //   $formatLine — JSON element format instruction
+  //   $pageText   — the extracted page text
+  const DEFAULT_AUTO_PROMPT = [
+    'You are analyzing the text content of a PDF page.',
+    'Identify the most important passages worth highlighting.',
+    '$howMany',
+    '',
+    'CRITICAL RULES:',
+    '1. The "text" value MUST be copied VERBATIM from the page text below (do not paraphrase, do not summarize).',
+    '2. Return ONLY a JSON array. No markdown fences, no commentary, no prose.',
+    '3. $formatLine',
+    '',
+    'Page text:',
+    '$pageText',
+  ].join('\n');
+
   let abortController = null;
 
   function debug(category, message, data) {
@@ -61,7 +79,7 @@ const AutoAnnotate = (() => {
       if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
       debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
 
-      const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes);
+      const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate);
       debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
       const messages = [];
       if (settings.systemPrompt && settings.systemPrompt.trim()) {
@@ -155,7 +173,7 @@ const AutoAnnotate = (() => {
   }
 
   /* ---------- Prompt building ---------- */
-  function buildPrompt(pageText, howMany, includeNotes) {
+  function buildPrompt(pageText, howMany, includeNotes, template) {
     const countLine = howMany && howMany > 0
       ? 'Return exactly ' + howMany + ' of the most important passages.'
       : 'Return the most important passages (as many as you judge relevant).';
@@ -164,19 +182,11 @@ const AutoAnnotate = (() => {
       ? 'Each element MUST be: {"text": "<exact excerpt copied verbatim from the page>", "note": "<a few words explaining why it matters>"}'
       : 'Each element MUST be: {"text": "<exact excerpt copied verbatim from the page>"}';
 
-    return [
-      'You are analyzing the text content of a PDF page.',
-      'Identify the most important passages worth highlighting.',
-      countLine,
-      '',
-      'CRITICAL RULES:',
-      '1. The "text" value MUST be copied VERBATIM from the page text below (do not paraphrase, do not summarize).',
-      '2. Return ONLY a JSON array. No markdown fences, no commentary, no prose.',
-      '3. ' + formatLine,
-      '',
-      'Page text:',
-      pageText,
-    ].join('\n');
+    const tmpl = (template && template.trim()) ? template.trim() : DEFAULT_AUTO_PROMPT;
+    return tmpl
+      .replace(/\$howMany/g, countLine)
+      .replace(/\$formatLine/g, formatLine)
+      .replace(/\$pageText/g, pageText);
   }
 
   /* ---------- JSON parsing (robust) ---------- */
@@ -209,5 +219,5 @@ const AutoAnnotate = (() => {
   function setPdfId(id) { _pdfId = id; }
   function HighlighterCurrentPdfId() { return _pdfId; }
 
-  return { init, run, abort, setPdfId, callbacks };
+  return { init, run, abort, setPdfId, callbacks, DEFAULT_AUTO_PROMPT };
 })();

@@ -182,6 +182,15 @@
             <input type="number" id="aiAutoHowMany" placeholder="leave empty = AI decides" min="1" max="50" />
           </label>
           <label class="check"><input type="checkbox" id="aiAutoNotes" checked /> Include notes</label>
+          <details class="ai-subsection">
+            <summary>Prompt Template</summary>
+            <textarea id="aiAutoTemplate" rows="10"
+              placeholder="Template is empty — the built-in default will be used."></textarea>
+            <div class="ai-subsection-actions">
+              <button id="aiAutoResetTpl" class="small">Reset to default</button>
+            </div>
+            <p class="hint">Placeholders: <code>$howMany</code> (count instruction), <code>$formatLine</code> (JSON element format), <code>$pageText</code> (page text content). Edit the text above to customize.</p>
+          </details>
           <div class="row">
             <button id="aiAutoRun" class="primary">Annotate</button>
             <button id="aiAutoStop" class="danger" hidden>Stop</button>

@@ -542,6 +542,15 @@ body.ai-open .ai-backdrop {
   color: var(--text-dim);
   line-height: 1.4;
 }
+.ai-subsection-actions {
+  padding: 6px 10px;
+  display: flex;
+  gap: 6px;
+}
+.ai-subsection-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
+}
 
 .ai-status {
   font-size: 12px;
