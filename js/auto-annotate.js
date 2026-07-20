@@ -13,9 +13,14 @@ const AutoAnnotate = (() => {
     onProgress: null,       // (msg)
     onError: null,          // (msg)
     onComplete: null,       // ({ created, skipped, total })
+    onDebug: null,          // (category, message, data?)
   };
 
   let abortController = null;
+
+  function debug(category, message, data) {
+    if (callbacks.onDebug) callbacks.onDebug(category, message, data);
+  }
 
   function init() {}
 
@@ -43,11 +48,21 @@ const AutoAnnotate = (() => {
 
     let created = 0, skipped = 0, total = 0;
 
+    debug('AUTO', 'Auto-annotate started', {
+      pages: pages.map((p) => p.page),
+      howMany: opts.howMany,
+      includeNotes: opts.includeNotes,
+      model: settings.model,
+      host: settings.host,
+    });
+
     for (const pg of pages) {
       if (abortController.signal.aborted) break;
       if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
+      debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
 
       const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes);
+      debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
       let raw;
       try {
         raw = await Ollama.chat({
@@ -59,14 +74,25 @@ const AutoAnnotate = (() => {
           numCtx: settings.numCtx,
           think: settings.reasoning,
           signal: abortController.signal,
+          onStats: (s) => {
+            debug('REQ', 'Page ' + pg.page + ': POST ' + s.url + ' | model=' + s.model +
+              ' | promptLen=' + s.requestLength);
+            debug('TIME', 'Page ' + pg.page + ': first token=' + s.timeToFirstTokenMs +
+              'ms | total=' + s.totalTimeMs + 'ms');
+          },
         });
       } catch (err) {
-        if (err.name === 'AbortError') break;
+        if (err.name === 'AbortError') { debug('AUTO', 'Aborted by user'); break; }
+        debug('ERR', 'Page ' + pg.page + ': ' + err.message);
         if (callbacks.onError) callbacks.onError('Ollama error on page ' + pg.page + ': ' + err.message);
         continue;
       }
 
+      debug('AUTO', 'Page ' + pg.page + ': raw AI response (' + raw.length + ' chars)',
+        raw.length > 500 ? raw.slice(0, 500) + '\n…[truncated]' : raw);
+
       const passages = parsePassages(raw);
+      debug('AUTO', 'Page ' + pg.page + ': parsed ' + passages.length + ' passage(s) from AI response');
       if (passages.length === 0) {
         if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': no passages parsed.');
         continue;
@@ -84,11 +110,18 @@ const AutoAnnotate = (() => {
         if (abortController.signal.aborted) break;
         total++;
         const snippet = (p.text || '').trim();
-        if (!snippet) { skipped++; continue; }
+        if (!snippet) { skipped++; debug('AUTO', 'Page ' + pg.page + ': empty snippet, skipped'); continue; }
         const range = TextGeometry.findSnippetRange(idx, snippet);
-        if (!range) { skipped++; continue; }
+        if (!range) {
+          skipped++;
+          debug('AUTO', 'Page ' + pg.page + ': NO MATCH (score below threshold)',
+            '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
+          continue;
+        }
+        debug('AUTO', 'Page ' + pg.page + ': matched (score=' + range.score.toFixed(2) + ')',
+          '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
         const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp);
-        if (!rects.length) { skipped++; continue; }
+        if (!rects.length) { skipped++; debug('AUTO', 'Page ' + pg.page + ': matched but no rects'); continue; }
         const data = {
           pdfId: HighlighterCurrentPdfId(),
           page: pg.page,
@@ -108,6 +141,7 @@ const AutoAnnotate = (() => {
       if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': done.');
     }
 
+    debug('AUTO', 'Auto-annotate complete', { created, skipped, total });
     if (callbacks.onComplete) callbacks.onComplete({ created, skipped, total });
   }
 

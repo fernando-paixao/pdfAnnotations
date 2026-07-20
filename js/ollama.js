@@ -54,6 +54,8 @@ const Ollama = (() => {
     // Remove undefined keys
     if (!opts.format) delete body.format;
 
+    const startTime = performance.now();
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -67,19 +69,40 @@ const Ollama = (() => {
     }
 
     if (opts.stream !== false) {
-      return readStream(res, opts);
+      return readStream(res, opts, url, body, startTime);
     }
     // Non-streaming: single JSON object
     const json = await res.json();
+    const endTime = performance.now();
+    const content = (json.message && json.message.content) || '';
     if (json.thinking && opts.onThinking) opts.onThinking(json.thinking);
-    return (json.message && json.message.content) || '';
+    emitStats(opts, url, body, content, startTime, endTime, endTime - startTime, false);
+    return content;
   }
 
-  async function readStream(res, opts) {
+  function emitStats(opts, url, body, responseText, startTime, endTime, firstTokenMs, stream) {
+    if (!opts.onStats) return;
+    opts.onStats({
+      url,
+      model: body.model,
+      stream,
+      think: body.think,
+      maxTokens: body.options.num_predict,
+      numCtx: body.options.num_ctx,
+      messageCount: body.messages.length,
+      requestLength: JSON.stringify(body.messages).length,
+      responseLength: responseText.length,
+      timeToFirstTokenMs: Math.round(firstTokenMs),
+      totalTimeMs: Math.round(endTime - startTime),
+    });
+  }
+
+  async function readStream(res, opts, url, body, startTime) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
     let full = '';
+    let firstTokenAt = null;
 
     for (;;) {
       const { done, value } = await reader.read();
@@ -97,11 +120,15 @@ const Ollama = (() => {
         if (chunk.thinking && opts.onThinking) opts.onThinking(chunk.thinking);
         const content = (chunk.message && chunk.message.content) || '';
         if (content) {
+          if (firstTokenAt === null) firstTokenAt = performance.now() - startTime;
           full += content;
           if (opts.onChunk) opts.onChunk(content);
         }
       }
     }
+    const endTime = performance.now();
+    const firstMs = firstTokenAt !== null ? firstTokenAt : (endTime - startTime);
+    emitStats(opts, url, body, full, startTime, endTime, firstMs, true);
     return full;
   }
 

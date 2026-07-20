@@ -156,8 +156,15 @@
       <!-- Response -->
       <details class="ai-section" open>
         <summary>Response</summary>
+        <div class="ai-response-toolbar">
+          <div class="view-toggle">
+            <button id="aiViewText" class="view-btn active" title="Plain text view">Text</button>
+            <button id="aiViewMarkdown" class="view-btn" title="Rendered Markdown view">Markdown</button>
+          </div>
+        </div>
         <div id="aiThinking" class="ai-thinking" hidden></div>
         <div id="aiResponse" class="ai-response"></div>
+        <div id="aiResponseMd" class="ai-response markdown-body" hidden></div>
       </details>
 
       <!-- Auto-annotate -->
@@ -176,6 +183,18 @@
           <div id="aiAutoStatus" class="ai-status"></div>
         </div>
       </details>
+
+      <!-- Debug -->
+      <details class="ai-section">
+        <summary>Debug <span class="debug-badge" id="aiDebugBadge" hidden>0</span></summary>
+        <div class="ai-debug-wrap">
+          <div class="ai-debug-toolbar">
+            <button id="aiDebugClear" class="small">Clear</button>
+            <label class="check small"><input type="checkbox" id="aiDebugAutoScroll" checked /> Auto-scroll</label>
+          </div>
+          <div id="aiDebugLog" class="ai-debug-log"></div>
+        </div>
+      </details>
     </div>
   </aside>
 
@@ -190,6 +209,7 @@
   <script src="js/text-geometry.js"></script>
   <script src="js/search.js"></script>
   <script src="js/ollama.js"></script>
+  <script src="js/markdown.js"></script>
   <script src="js/ai-panel.js"></script>
   <script src="js/auto-annotate.js"></script>
   <script src="js/annotations-ui.js"></script>

@@ -185,6 +185,9 @@
     refreshUI();
     showToast('AI created ' + created + ' annotation(s)');
   };
+  AutoAnnotate.callbacks.onDebug = (category, message, data) => {
+    AIPanel.debugLog(category, message, data);
+  };
 
   // ---------- Load PDF ----------
   async function loadPdfFile(file) {

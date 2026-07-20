@@ -72,3 +72,18 @@ Since there's no Rust backend, Ollama must be started with OLLAMA_ORIGINS=* (doc
 
 9-step todo list covering: ollama client → HTML → CSS → AI panel → text-geometry refactor → auto-annotate → wiring → README → testing.
 ---
+Can you add on the AI response an option to see the result output in other formats viewer: textViewer (actual), markdownViewer
+---
+On debug output I'm getting:
+REQ 22:13:59.953 Page 59: POST http://localai:11001/api/chat | model=qwen3.5:2b | promptLen=2284
+
+I would like to have the entire content of the request body too
+---
+Can you add a feature optional advanced features:
+
+- System prompt: Sent as a role: system message before the user prompt when using /api/chat.
+- 
+--- Future
+Can you add queue actions to AI, as they has some time to be answered by Ollama service the user.
+And add a sound to be played while each action queued is completed.
+---

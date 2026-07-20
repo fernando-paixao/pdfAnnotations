@@ -24,6 +24,7 @@ const AIPanel = (() => {
   let settings = { ...DEFAULT_SETTINGS };
   let els = {};
   let abortController = null;
+  let viewMode = 'text'; // 'text' | 'markdown'
 
   const callbacks = {
     getCurrentPage: null,   // () => number
@@ -72,6 +73,9 @@ const AIPanel = (() => {
     els.send = $('aiSend');
     els.stop = $('aiStop');
     els.response = $('aiResponse');
+    els.responseMd = $('aiResponseMd');
+    els.viewText = $('aiViewText');
+    els.viewMarkdown = $('aiViewMarkdown');
     els.thinking = $('aiThinking');
     els.status = $('aiStatus');
     els.autoHowMany = $('aiAutoHowMany');
@@ -79,6 +83,10 @@ const AIPanel = (() => {
     els.autoRun = $('aiAutoRun');
     els.autoStop = $('aiAutoStop');
     els.autoStatus = $('aiAutoStatus');
+    els.debugLog = $('aiDebugLog');
+    els.debugClear = $('aiDebugClear');
+    els.debugBadge = $('aiDebugBadge');
+    els.debugAutoScroll = $('aiDebugAutoScroll');
   }
 
   function applySettingsToUI() {
@@ -138,8 +146,11 @@ const AIPanel = (() => {
     });
     els.send.addEventListener('click', onSend);
     els.stop.addEventListener('click', onStop);
+    els.viewText.addEventListener('click', () => setViewMode('text'));
+    els.viewMarkdown.addEventListener('click', () => setViewMode('markdown'));
     els.autoRun.addEventListener('click', onAutoRun);
     els.autoStop.addEventListener('click', onAutoStop);
+    els.debugClear.addEventListener('click', clearDebug);
   }
 
   /* ---------- Fetch models ---------- */
@@ -198,6 +209,23 @@ const AIPanel = (() => {
     return { text: parts.join('\n\n'), pages };
   }
 
+  /* ---------- View mode toggle ---------- */
+  function setViewMode(mode) {
+    if (mode === viewMode) return;
+    viewMode = mode;
+    els.viewText.classList.toggle('active', mode === 'text');
+    els.viewMarkdown.classList.toggle('active', mode === 'markdown');
+    if (mode === 'markdown') {
+      // Render current response text into markdown
+      els.responseMd.innerHTML = Markdown.render(els.response.textContent);
+      els.response.hidden = true;
+      els.responseMd.hidden = false;
+    } else {
+      els.response.hidden = false;
+      els.responseMd.hidden = true;
+    }
+  }
+
   /* ---------- Send (prompt template) ---------- */
   async function onSend() {
     collectSettings();
@@ -206,6 +234,7 @@ const AIPanel = (() => {
       return;
     }
     els.response.textContent = '';
+    els.responseMd.innerHTML = '';
     els.thinking.textContent = '';
     els.thinking.hidden = true;
     els.status.textContent = 'Gathering context…';
@@ -227,13 +256,29 @@ const AIPanel = (() => {
         numCtx: settings.numCtx,
         think: settings.reasoning,
         signal: abortController.signal,
-        onChunk: (c) => { els.response.textContent += c; },
+        onChunk: (c) => {
+          els.response.textContent += c;
+          if (viewMode === 'markdown') {
+            els.responseMd.innerHTML = Markdown.render(els.response.textContent);
+          }
+        },
         onThinking: (t) => {
           els.thinking.hidden = false;
           els.thinking.textContent += t;
         },
+        onStats: (s) => {
+          debugLog('REQ', 'POST ' + s.url + ' | model=' + s.model +
+            ' | stream=' + s.stream + ' | think=' + s.think +
+            ' | maxTokens=' + s.maxTokens + ' | numCtx=' + s.numCtx +
+            ' | messages=' + s.messageCount + ' | promptLen=' + s.requestLength);
+          debugLog('RESP', 'Response length: ' + s.responseLength + ' chars');
+          debugLog('TIME', 'First token: ' + formatMs(s.timeToFirstTokenMs) +
+            ' | Total: ' + formatMs(s.totalTimeMs));
+        },
       });
       if (!settings.streaming) els.response.textContent = result;
+      // Always sync markdown view with final result
+      els.responseMd.innerHTML = Markdown.render(els.response.textContent);
       els.status.textContent = 'Done.';
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -289,6 +334,54 @@ const AIPanel = (() => {
   function setAutoStatus(msg) { els.autoStatus.textContent = msg; }
   function setAutoDone() { els.autoRun.disabled = false; els.autoStop.hidden = true; }
 
+  /* ---------- Debug log ---------- */
+  let debugCount = 0;
+
+  function debugLog(category, message, data) {
+    if (!els.debugLog) return;
+    const entry = document.createElement('div');
+    entry.className = 'debug-entry';
+    const time = new Date().toLocaleTimeString([], { hour12: false }) + '.' +
+      String(Date.now() % 1000).padStart(3, '0');
+    const tag = document.createElement('span');
+    tag.className = 'debug-tag debug-tag-' + category;
+    tag.textContent = category;
+    const timeEl = document.createElement('span');
+    timeEl.className = 'debug-time';
+    timeEl.textContent = ' ' + time;
+    const msg = document.createElement('span');
+    msg.textContent = ' ' + message;
+    entry.appendChild(tag);
+    entry.appendChild(timeEl);
+    entry.appendChild(msg);
+    if (data !== undefined) {
+      const dataEl = document.createElement('span');
+      dataEl.className = 'debug-data';
+      dataEl.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      entry.appendChild(dataEl);
+    }
+    els.debugLog.appendChild(entry);
+    debugCount++;
+    if (els.debugBadge) {
+      els.debugBadge.textContent = debugCount;
+      els.debugBadge.hidden = false;
+    }
+    if (els.debugAutoScroll && els.debugAutoScroll.checked) {
+      els.debugLog.scrollTop = els.debugLog.scrollHeight;
+    }
+  }
+
+  function clearDebug() {
+    if (els.debugLog) els.debugLog.innerHTML = '';
+    debugCount = 0;
+    if (els.debugBadge) els.debugBadge.hidden = true;
+  }
+
+  function formatMs(ms) {
+    if (ms < 1000) return ms + ' ms';
+    return (ms / 1000).toFixed(2) + ' s';
+  }
+
   /* ---------- Helpers ---------- */
   function escapeHtml(s) {
     const map = {};
@@ -300,5 +393,5 @@ const AIPanel = (() => {
     return String(s).replace(/[&<>"']/g, (c) => map[c.charCodeAt(0)] || c);
   }
 
-  return { init, getSettings, callbacks, setAutoStatus, setAutoDone };
+  return { init, getSettings, callbacks, setAutoStatus, setAutoDone, debugLog };
 })();
