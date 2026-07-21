@@ -182,6 +182,9 @@ const Highlighter = (() => {
 
   /* ---------- Drawing ---------- */
   function drawAnnotation(ann) {
+    // Ensure annotation is tracked in internal maps (fixes AI-created annotations
+    // that are drawn via onAnnotationCreated without going through addInternal)
+    if (!byId.has(ann.id)) addInternal(ann);
     const wrapper = PDFViewer.getPageWrapper(ann.page);
     if (!wrapper) return;
     const layer = wrapper.querySelector('.highlight-layer');
