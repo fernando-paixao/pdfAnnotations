@@ -83,6 +83,19 @@ button.danger:hover { background: var(--danger); color: #fff; }
 }
 .spacer { flex: 1; }
 
+/* Language selector */
+.lang-select {
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.lang-select:focus { outline: none; border-color: var(--accent); }
+
 .nav-group, .zoom-group, .data-group { display: flex; align-items: center; gap: 6px; }
 .page-indicator { display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 #pageInput { width: 42px; text-align: center; padding: 4px; border-radius: 4px;
@@ -622,7 +635,7 @@ body.ai-open .ai-backdrop {
   font-family: inherit;
 }
 .ai-response:empty::before {
-  content: 'Response will appear here.';
+  content: var(--i18n-response-empty, 'Response will appear here.');
   color: var(--text-dim);
   font-style: italic;
 }
@@ -755,7 +768,7 @@ body.ai-open .ai-backdrop {
   color: #b0b0d0;
 }
 .ai-debug-log:empty::before {
-  content: 'No debug messages yet.';
+  content: var(--i18n-debug-empty, 'No debug messages yet.');
   color: var(--text-dim);
   font-style: italic;
 }

@@ -46,7 +46,7 @@ const AnnotationsUI = (() => {
     if (allAnnotations.length > 0 && items.length === 0) {
       const li = document.createElement('li');
       li.className = 'empty-annotations';
-      li.textContent = 'No matches.';
+      li.textContent = I18N.t('panel.noMatches');
       listEl.appendChild(li);
       return;
     }
@@ -82,7 +82,7 @@ const AnnotationsUI = (() => {
 
       const del = document.createElement('button');
       del.className = 'danger';
-      del.textContent = 'Delete';
+      del.textContent = I18N.t('editor.delete');
       del.style.marginTop = '8px';
       del.addEventListener('click', (e) => {
         e.stopPropagation();

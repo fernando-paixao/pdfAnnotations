@@ -19,7 +19,7 @@ const AIPanel = (() => {
     pdfContext: '',
     contextScope: 'entirePage',
     pageCount: 1,
-    promptTemplate: 'Summarize the key points of the following text:\n\n$text',
+    promptTemplate: I18N.t('ai.defaultPrompt'),
     includeNotes: true,
     howManyAnnotations: '',
     autoAnnotateTemplate: '',
@@ -121,7 +121,7 @@ const AIPanel = (() => {
     els.pageCount.value = settings.pageCount;
     els.autoHowMany.value = settings.howManyAnnotations;
     els.autoNotes.checked = settings.includeNotes;
-    els.autoTemplate.value = settings.autoAnnotateTemplate || AutoAnnotate.DEFAULT_AUTO_PROMPT;
+    els.autoTemplate.value = settings.autoAnnotateTemplate || I18N.t('ai.defaultAutoPrompt');
     updatePageCountVisibility();
   }
 
@@ -178,7 +178,7 @@ const AIPanel = (() => {
     els.autoRun.addEventListener('click', onAutoRun);
     els.autoStop.addEventListener('click', onAutoStop);
     els.autoResetTpl.addEventListener('click', () => {
-      els.autoTemplate.value = AutoAnnotate.DEFAULT_AUTO_PROMPT;
+      els.autoTemplate.value = I18N.t('ai.defaultAutoPrompt');
       collectSettings();
     });
     els.debugClear.addEventListener('click', clearDebug);
@@ -188,13 +188,13 @@ const AIPanel = (() => {
   async function onFetchModels() {
     collectSettings();
     els.fetchModels.disabled = true;
-    els.fetchModels.textContent = 'Fetching…';
+    els.fetchModels.textContent = I18N.t('ai.fetching');
     els.status.textContent = '';
     try {
       const models = await Ollama.listModels(settings.host);
       els.modelSelect.innerHTML = '';
       if (models.length === 0) {
-        els.modelSelect.innerHTML = '<option value="">No models found</option>';
+        els.modelSelect.innerHTML = '<option value="">' + I18N.t('ai.status.noModels') + '</option>';
       } else {
         const cur = settings.model;
         models.forEach((id) => {
@@ -205,14 +205,14 @@ const AIPanel = (() => {
         });
       }
       els.modelSelect.hidden = false;
-      els.status.textContent = 'Found ' + models.length + ' model(s).';
+      els.status.textContent = I18N.t('ai.status.foundModels') + ' ' + models.length + ' ' + I18N.t('ai.status.models');
     } catch (err) {
       els.status.innerHTML = '⚠️ ' + escapeHtml(err.message) +
-        '<br><span class="hint">Make sure Ollama is running and started with ' +
-        '<code>OLLAMA_ORIGINS=*</code> to allow browser access.</span>';
+        '<br><span class="hint">' + I18N.t('ai.status.corsHintSettings') + ' ' +
+        '<code>OLLAMA_ORIGINS=*</code> ' + I18N.t('ai.status.corsAllow') + '</span>';
     } finally {
       els.fetchModels.disabled = false;
-      els.fetchModels.textContent = 'Fetch Models';
+      els.fetchModels.textContent = I18N.t('ai.fetchModels');
     }
   }
 
@@ -261,14 +261,14 @@ const AIPanel = (() => {
   async function onSend() {
     collectSettings();
     if (!settings.model) {
-      els.status.textContent = '⚠️ Please set a model first.';
+      els.status.textContent = I18N.t('ai.status.setModel');
       return;
     }
 
     // Gather context NOW (captures current page/selection state)
     els.status.textContent = isProcessing
-      ? 'Queuing… (gathering context)'
-      : 'Gathering context…';
+      ? I18N.t('ai.status.queuing')
+      : I18N.t('ai.status.gathering');
     const ctx = await gatherContext();
     const pdfCtx = settings.pdfContext && settings.pdfContext.trim()
       ? settings.pdfContext.trim()
@@ -321,7 +321,7 @@ const AIPanel = (() => {
 
     abortController = new AbortController();
     try {
-      els.status.textContent = 'Processing #' + item.id + ' (' + item.label + ')…';
+      els.status.textContent = I18N.t('ai.status.generating') + ' #' + item.id + ' (' + item.label + ')…';
       const result = await Ollama.chat({
         host: settings.host,
         model: settings.model,
@@ -354,14 +354,14 @@ const AIPanel = (() => {
       });
       if (!settings.streaming) els.response.textContent = result;
       els.responseMd.innerHTML = Markdown.render(els.response.textContent);
-      els.status.textContent = '✓ Done #' + item.id + ' (' + item.label + ')';
+      els.status.textContent = '✓ ' + I18N.t('ai.status.done') + ' #' + item.id + ' (' + item.label + ')';
       playCompletionSound();
     } catch (err) {
       if (err.name === 'AbortError') {
-        els.status.textContent = 'Stopped #' + item.id + '.';
+        els.status.textContent = I18N.t('ai.status.stopped') + ' #' + item.id + '.';
       } else {
         els.status.innerHTML = '⚠️ #' + item.id + ' ' + escapeHtml(err.message) +
-          '<br><span class="hint">If this is a CORS error, start Ollama with ' +
+          '<br><span class="hint">' + I18N.t('ai.status.corsHint') + ' ' +
           '<code>OLLAMA_ORIGINS=*</code>.</span>';
         playErrorSound();
       }
@@ -394,7 +394,7 @@ const AIPanel = (() => {
     const n = queue.length;
     queue = [];
     updateQueueUI();
-    if (n > 0) els.status.textContent = 'Cleared ' + n + ' queued action(s).';
+    if (n > 0) els.status.textContent = I18N.t('msg.cleared') + ' ' + n + ' ' + I18N.t('msg.queued') + '.';
   }
 
   function updateQueueUI() {
@@ -488,12 +488,12 @@ const AIPanel = (() => {
   function onAutoRun() {
     collectSettings();
     if (!settings.model) {
-      els.autoStatus.textContent = '⚠️ Please set a model first.';
+      els.autoStatus.textContent = I18N.t('ai.status.setModel');
       return;
     }
     els.autoRun.disabled = true;
     els.autoStop.hidden = false;
-    els.autoStatus.textContent = 'Starting…';
+    els.autoStatus.textContent = I18N.t('auto.starting');
     const howMany = settings.howManyAnnotations ? parseInt(settings.howManyAnnotations, 10) : null;
     gatherContext().then((ctx) => {
       if (ctx.pages.length === 0 && ctx.text) {

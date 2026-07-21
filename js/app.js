@@ -35,6 +35,7 @@
   const nsCreateBtn = $('nsCreate');
   const nsRenameBtn = $('nsRename');
   const nsDeleteBtn = $('nsDelete');
+  const langSelect = $('langSelect');
 
   // ---------- Helpers ----------
   function uuid() {
@@ -111,7 +112,7 @@
     await Storage.deleteAnnotation(id);
     currentAnnotations = currentAnnotations.filter((a) => a.id !== id);
     refreshUI();
-    showToast('Annotation deleted');
+    showToast(I18N.t('msg.annotationDeleted'));
   };
 
   // ---------- Search (Find in PDF) ----------
@@ -187,10 +188,10 @@
   AutoAnnotate.callbacks.onProgress = (msg) => AIPanel.setAutoStatus(msg);
   AutoAnnotate.callbacks.onError = (msg) => AIPanel.setAutoStatus('⚠️ ' + msg);
   AutoAnnotate.callbacks.onComplete = ({ created, skipped, total }) => {
-    AIPanel.setAutoStatus('Done: ' + created + ' created, ' + skipped + ' unmatched (of ' + total + ').');
+    AIPanel.setAutoStatus(I18N.t('auto.done') + ' ' + created + ' ' + I18N.t('auto.created') + ' ' + skipped + ' ' + I18N.t('auto.unmatched') + ' ' + total + ' ' + I18N.t('auto.total'));
     AIPanel.setAutoDone();
     refreshUI();
-    showToast('AI created ' + created + ' annotation(s)');
+    showToast(I18N.t('msg.aiCreated') + ' ' + created + ' ' + I18N.t('msg.annotation_s'));
   };
   AutoAnnotate.callbacks.onDebug = (category, message, data) => {
     AIPanel.debugLog(category, message, data);
@@ -207,11 +208,11 @@
     refreshUI();
     redrawVisiblePages();
     updateNamespaceSelector();
-    showToast(anns.length + ' annotation(s) in "' + (currentNamespaces.find(n => n.id === nsId) || {}).name + '"');
+    showToast(anns.length + ' ' + I18N.t('msg.inNamespace') + ' "' + (currentNamespaces.find(n => n.id === nsId) || {}).name + '"');
   }
 
   async function createNamespace(name) {
-    const nsName = (name || '').trim() || 'New Namespace';
+    const nsName = (name || '').trim() || I18N.t('ns.newNamespace');
     const ns = {
       id: 'ns_' + uuid(),
       name: nsName,
@@ -228,7 +229,7 @@
   async function renameNamespace(nsId) {
     const ns = currentNamespaces.find(n => n.id === nsId);
     if (!ns) return;
-    const newName = prompt('Rename namespace:', ns.name);
+    const newName = prompt(I18N.t('ns.renamePrompt'), ns.name);
     if (newName === null) return; // cancelled
     const trimmed = newName.trim();
     if (!trimmed || trimmed === ns.name) return;
@@ -236,17 +237,17 @@
     ns.updatedAt = Date.now();
     await Storage.updateNamespace(ns);
     updateNamespaceSelector();
-    showToast('Renamed to "' + trimmed + '"');
+    showToast(I18N.t('msg.namespaceRenamed') + ' "' + trimmed + '"');
   }
 
   async function deleteNamespace(nsId) {
     const ns = currentNamespaces.find(n => n.id === nsId);
     if (!ns) return;
     if (currentNamespaces.length <= 1) {
-      showToast('Cannot delete the last namespace');
+      showToast(I18N.t('msg.cantDeleteLast'));
       return;
     }
-    if (!confirm('Delete namespace "' + ns.name + '" and all its annotations?')) return;
+    if (!confirm(I18N.t('ns.deleteConfirm') + ' "' + ns.name + '" ' + I18N.t('ns.andAllAnnotations'))) return;
     await Storage.deleteNamespaceAndAnnotations(nsId);
     currentNamespaces = currentNamespaces.filter(n => n.id !== nsId);
     if (currentNamespaceId === nsId) {
@@ -254,7 +255,7 @@
     } else {
       updateNamespaceSelector();
     }
-    showToast('Namespace deleted');
+    showToast(I18N.t('msg.namespaceDeleted'));
   }
 
   function updateNamespaceSelector() {
@@ -272,7 +273,7 @@
   async function loadPdfFile(file) {
     if (!file) return;
     try {
-      showToast('Loading PDF…');
+      showToast(I18N.t('msg.loading'));
       currentFileName = file.name;
 
       // 1) Stable PDF id
@@ -324,7 +325,7 @@
       });
     } catch (err) {
       console.error(err);
-      showToast('Failed to load PDF: ' + (err && err.message ? err.message : err));
+      showToast(I18N.t('msg.loadFailed') + ' ' + (err && err.message ? err.message : err));
     }
   }
 
@@ -339,7 +340,7 @@
     if (namespaceSelect.value) selectNamespace(namespaceSelect.value);
   });
   nsCreateBtn.addEventListener('click', () => {
-    const name = prompt('New namespace name:', '');
+    const name = prompt(I18N.t('ns.newName'), '');
     if (name !== null) createNamespace(name);
   });
   nsRenameBtn.addEventListener('click', () => {
@@ -387,7 +388,7 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    showToast('Exported ' + currentAnnotations.length + ' annotation(s)');
+    showToast(I18N.t('msg.exported') + ' ' + currentAnnotations.length + ' ' + I18N.t('msg.annotation_s'));
   });
 
   importInput.addEventListener('change', async (e) => {
@@ -419,10 +420,10 @@
       Highlighter.setAnnotations(currentAnnotations);
       refreshUI();
       redrawVisiblePages();
-      showToast('Imported ' + added + ' annotation(s)');
+      showToast(I18N.t('msg.imported') + ' ' + added + ' ' + I18N.t('msg.annotation_s'));
     } catch (err) {
       console.error(err);
-      showToast('Import failed: ' + (err && err.message ? err.message : err));
+      showToast(I18N.t('msg.importFailed') + ' ' + (err && err.message ? err.message : err));
     }
   });
 
@@ -431,9 +432,23 @@
     for (let i = 1; i <= n; i++) Highlighter.redrawPage(i);
   }
 
+  // ---------- Language selector ----------
+  if (langSelect) {
+    langSelect.value = I18N.getLang();
+    langSelect.addEventListener('change', () => {
+      I18N.setLang(langSelect.value);
+      I18N.applyTranslations();
+      // Update dynamic UI elements that were built with t() calls
+      refreshUI();
+    });
+  }
+
+  // Apply translations on initial load
+  I18N.applyTranslations();
+
   // ---------- Init DB early ----------
   Storage.openDB().catch((e) => {
     console.error('IndexedDB open failed', e);
-    showToast('Storage unavailable (IndexedDB blocked)');
+    showToast(I18N.t('msg.storageUnavailable'));
   });
 })();

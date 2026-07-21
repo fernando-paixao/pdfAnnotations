@@ -9,47 +9,53 @@
 <body>
   <!-- ===== Toolbar ===== -->
   <header id="toolbar">
-    <label class="file-btn" title="Open a local PDF">
-      <span>Open PDF</span>
+    <label class="file-btn" data-i18n-title="toolbar.openPdf">
+      <span data-i18n="toolbar.openPdf">Open PDF</span>
       <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden />
     </label>
 
-    <div class="pdf-name" id="pdfName">No PDF loaded</div>
+    <div class="pdf-name" id="pdfName" data-i18n="toolbar.noPdf">No PDF loaded</div>
 
     <div class="search-group" id="searchGroup" hidden>
-      <input type="text" id="pdfSearch" placeholder="Find in PDF…" />
+      <input type="text" id="pdfSearch" data-i18n-placeholder="toolbar.findInPdf" placeholder="Find in PDF…" />
       <span id="searchCount" class="search-count"></span>
-      <button id="searchPrev" title="Previous match (Shift+Enter)">▲</button>
-      <button id="searchNext" title="Next match (Enter)">▼</button>
-      <button id="searchClear" title="Clear search (Esc)">✕</button>
+      <button id="searchPrev" data-i18n-title="toolbar.prevMatch" title="Previous match (Shift+Enter)">▲</button>
+      <button id="searchNext" data-i18n-title="toolbar.nextMatch" title="Next match (Enter)">▼</button>
+      <button id="searchClear" data-i18n-title="toolbar.clearSearch" title="Clear search (Esc)">✕</button>
     </div>
 
     <div class="spacer"></div>
 
+    <!-- Language selector -->
+    <select id="langSelect" class="lang-select" title="Language / Idioma">
+      <option value="en">EN</option>
+      <option value="pt-BR">PT</option>
+    </select>
+
     <div class="nav-group" id="navGroup" hidden>
-      <button id="prevPage" title="Previous page">◀</button>
+      <button id="prevPage" data-i18n-title="toolbar.prevPage" title="Previous page">◀</button>
       <span class="page-indicator">
         <input type="number" id="pageInput" min="1" value="1" />
         / <span id="pageCount">1</span>
       </span>
-      <button id="nextPage" title="Next page">▶</button>
+      <button id="nextPage" data-i18n-title="toolbar.nextPage" title="Next page">▶</button>
     </div>
 
     <div class="zoom-group" id="zoomGroup" hidden>
-      <button id="zoomOut" title="Zoom out">−</button>
+      <button id="zoomOut" data-i18n-title="toolbar.zoomOut" title="Zoom out">−</button>
       <span id="zoomLevel">100%</span>
-      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="zoomIn" data-i18n-title="toolbar.zoomIn" title="Zoom in">+</button>
     </div>
 
     <div class="data-group" id="dataGroup" hidden>
-      <button id="exportBtn" title="Export annotations to JSON">Export</button>
-      <label class="file-btn small" title="Import annotations from JSON">
-        <span>Import</span>
+      <button id="exportBtn" data-i18n="toolbar.export" data-i18n-title="toolbar.export" title="Export annotations to JSON">Export</button>
+      <label class="file-btn small" data-i18n-title="toolbar.import">
+        <span data-i18n="toolbar.import">Import</span>
         <input type="file" id="importInput" accept="application/json,.json" hidden />
       </label>
     </div>
 
-    <button id="aiToggle" class="ai-toggle" title="Toggle AI panel (local Ollama)">AI</button>
+    <button id="aiToggle" class="ai-toggle" data-i18n="toolbar.ai" data-i18n-title="ai.localOllama" title="Toggle AI panel (local Ollama)">AI</button>
   </header>
 
   <!-- ===== Main layout ===== -->
@@ -57,9 +63,9 @@
     <!-- PDF viewer -->
     <section id="viewer" tabindex="0">
       <div id="emptyState" class="empty-state">
-        <h2>Open a PDF to begin</h2>
-        <p>Select text to highlight it and add annotations.</p>
-        <p class="hint">Everything runs locally in your browser — no upload, works offline.</p>
+        <h2 data-i18n="viewer.openToBegin">Open a PDF to begin</h2>
+        <p data-i18n="viewer.selectHint">Select text to highlight it and add annotations.</p>
+        <p class="hint" data-i18n="viewer.offlineHint">Everything runs locally in your browser — no upload, works offline.</p>
       </div>
       <div id="pagesContainer"></div>
     </section>
@@ -67,33 +73,34 @@
     <!-- Annotations side panel -->
     <aside id="sidePanel">
       <div class="panel-header">
-        <h2>Annotations</h2>
+        <h2 data-i18n="panel.annotations">Annotations</h2>
         <span id="annotationCount" class="count">0</span>
       </div>
       <!-- Namespace selector -->
       <div class="namespace-bar" id="namespaceBar" hidden>
-        <select id="namespaceSelect" title="Select namespace"></select>
-        <button id="nsCreate" class="ns-btn" title="Create new namespace">+</button>
-        <button id="nsRename" class="ns-btn" title="Rename namespace">✎</button>
-        <button id="nsDelete" class="ns-btn danger" title="Delete namespace">🗑</button>
+        <select id="namespaceSelect" data-i18n-title="ns.selectTitle" title="Select namespace"></select>
+        <button id="nsCreate" class="ns-btn" data-i18n-title="ns.createTitle" title="Create new namespace">+</button>
+        <button id="nsRename" class="ns-btn" data-i18n-title="ns.renameTitle" title="Rename namespace">✎</button>
+        <button id="nsDelete" class="ns-btn danger" data-i18n-title="ns.deleteTitle" title="Delete namespace">🗑</button>
       </div>
-      <input type="text" id="searchBox" placeholder="Search annotations…" hidden />
+      <input type="text" id="searchBox" data-i18n-placeholder="panel.searchPlaceholder" placeholder="Search annotations…" hidden />
       <ul id="annotationList" class="annotation-list"></ul>
       <div id="emptyAnnotations" class="empty-annotations">
-        No annotations yet. Select text in the PDF and click <strong>Highlight</strong>.
+        <span data-i18n="panel.empty">No annotations yet. Select text in the PDF and click</span>
+        <strong data-i18n="panel.emptyHighlight">Highlight</strong>.
       </div>
     </aside>
   </main>
 
   <!-- Floating highlight button (appears near a text selection) -->
-  <button id="highlightBtn" class="highlight-btn" hidden>Highlight</button>
+  <button id="highlightBtn" class="highlight-btn" hidden data-i18n="editor.highlight">Highlight</button>
 
   <!-- Highlight editor popover -->
   <div id="editorPopover" class="editor-popover" hidden>
-    <textarea id="editorText" placeholder="Add a note (optional)…"></textarea>
+    <textarea id="editorText" data-i18n-placeholder="editor.notePlaceholder" placeholder="Add a note (optional)…"></textarea>
     <div class="editor-actions">
-      <button id="editorDelete" class="danger">Delete</button>
-      <button id="editorSave" class="primary">Save</button>
+      <button id="editorDelete" class="danger" data-i18n="editor.delete">Delete</button>
+      <button id="editorSave" class="primary" data-i18n="editor.save">Save</button>
     </div>
   </div>
 
@@ -101,37 +108,37 @@
   <div id="aiBackdrop" class="ai-backdrop"></div>
   <aside id="aiPanel" class="ai-panel">
     <div class="ai-panel-header">
-      <h2>AI Assistant</h2>
-      <span class="ai-subtitle">Local Ollama</span>
+      <h2 data-i18n="ai.assistant">AI Assistant</h2>
+      <span class="ai-subtitle" data-i18n="ai.localOllama">Local Ollama</span>
     </div>
 
     <div class="ai-panel-body">
       <!-- Settings -->
       <details class="ai-section" open>
-        <summary>Settings</summary>
+        <summary data-i18n="ai.settings">Settings</summary>
         <div class="ai-form">
-          <label>Host
+          <label><span data-i18n="ai.host">Host</span>
             <input type="text" id="aiHost" placeholder="http://localhost:11434" />
           </label>
-          <label>Model
+          <label><span data-i18n="ai.model">Model</span>
             <div class="row">
               <input type="text" id="aiModel" placeholder="e.g. llama3.2" />
-              <button id="aiFetchModels" class="small">Fetch Models</button>
+              <button id="aiFetchModels" class="small" data-i18n="ai.fetchModels">Fetch Models</button>
             </div>
             <select id="aiModelSelect" hidden></select>
           </label>
           <div class="row">
-            <label>Max tokens
+            <label><span data-i18n="ai.maxTokens">Max tokens</span>
               <input type="number" id="aiMaxTokens" value="2048" min="1" />
             </label>
-            <label>Context window
+            <label><span data-i18n="ai.contextWindow">Context window</span>
               <input type="number" id="aiNumCtx" value="8192" min="512" />
             </label>
           </div>
           <div class="row checkboxes">
-            <label class="check"><input type="checkbox" id="aiReasoning" /> Reasoning</label>
-            <label class="check"><input type="checkbox" id="aiStreaming" checked /> Streaming</label>
-            <label class="check"><input type="checkbox" id="aiSoundEnabled" checked /> 🔔 Sound</label>
+            <label class="check"><input type="checkbox" id="aiReasoning" /> <span data-i18n="ai.reasoning">Reasoning</span></label>
+            <label class="check"><input type="checkbox" id="aiStreaming" checked /> <span data-i18n="ai.streaming">Streaming</span></label>
+            <label class="check"><input type="checkbox" id="aiSoundEnabled" checked /> <span data-i18n="ai.sound">🔔 Sound</span></label>
           </div>
           <div id="aiStatus" class="ai-status"></div>
         </div>
@@ -139,37 +146,40 @@
 
       <!-- Prompt template -->
       <details class="ai-section" open>
-        <summary>Prompt Template</summary>
+        <summary data-i18n="ai.promptTemplate">Prompt Template</summary>
         <div class="ai-form">
           <details class="ai-subsection">
-            <summary>System Prompt (optional)</summary>
+            <summary data-i18n="ai.systemPrompt">System Prompt (optional)</summary>
             <textarea id="aiSystemPrompt" rows="3"
+              data-i18n-placeholder="ai.systemPromptPlaceholder"
               placeholder="e.g. You are a helpful assistant that analyzes PDF documents. Answer concisely."></textarea>
-            <p class="hint">Sent as a <code>role: system</code> message before your prompt.</p>
+            <p class="hint"><span data-i18n="ai.systemPromptHint">Sent as a</span> <code>role: system</code> <span data-i18n="ai.systemPromptHint2">message before your prompt.</span></p>
           </details>
           <details class="ai-subsection">
-            <summary>PDF Context (optional)</summary>
+            <summary data-i18n="ai.pdfContext">PDF Context (optional)</summary>
             <textarea id="aiPdfContext" rows="3"
+              data-i18n-placeholder="ai.pdfContextPlaceholder"
               placeholder="e.g. This is a research paper about quantum computing published in 2024. The author discusses…"></textarea>
-            <p class="hint">Background info injected into your prompt via <code>$pdfContext</code>.</p>
+            <p class="hint"><span data-i18n="ai.pdfContextHint">Background info injected into your prompt via</span> <code>$pdfContext</code>.</p>
           </details>
           <textarea id="aiPromptTemplate" rows="4"
+            data-i18n-placeholder="ai.promptPlaceholder"
             placeholder="Write your prompt. Use $text where the PDF page text goes."></textarea>
-          <p class="hint">Placeholders: <code>$text</code> (page text), <code>$pdfContext</code> (your context above).</p>
-          <label>Context scope
+          <p class="hint"><span data-i18n="ai.promptHint">Placeholders:</span> <code>$text</code> <span data-i18n="ai.promptHintText">(page text)</span>, <code>$pdfContext</code> <span data-i18n="ai.promptHintContext">(your context above).</span></p>
+          <label><span data-i18n="ai.contextScope">Context scope</span>
             <select id="aiContextScope">
-              <option value="selectedText">Selected text</option>
-              <option value="entirePage" selected>Entire current page</option>
-              <option value="entirePages">Multiple pages (from current)</option>
+              <option value="selectedText" data-i18n="ai.scope.selectedText">Selected text</option>
+              <option value="entirePage" selected data-i18n="ai.scope.entirePage">Entire current page</option>
+              <option value="entirePages" data-i18n="ai.scope.entirePages">Multiple pages (from current)</option>
             </select>
           </label>
-          <label id="aiPageCountWrap" hidden>Number of pages
+          <label id="aiPageCountWrap" hidden><span data-i18n="ai.pageCount">Number of pages</span>
             <input type="number" id="aiPageCount" value="1" min="1" max="50" />
           </label>
           <div class="row">
-            <button id="aiSend" class="primary">Send</button>
-            <button id="aiStop" class="danger" hidden>Stop</button>
-            <button id="aiClearQueue" class="small" hidden title="Clear queued actions">Clear Queue</button>
+            <button id="aiSend" class="primary" data-i18n="ai.send">Send</button>
+            <button id="aiStop" class="danger" hidden data-i18n="ai.stop">Stop</button>
+            <button id="aiClearQueue" class="small" hidden data-i18n="ai.clearQueue" title="Clear queued actions">Clear Queue</button>
             <span id="aiQueueBadge" class="queue-badge" hidden title="Queued actions">0</span>
           </div>
         </div>
@@ -177,11 +187,11 @@
 
       <!-- Response -->
       <details class="ai-section" open>
-        <summary>Response</summary>
+        <summary data-i18n="ai.response">Response</summary>
         <div class="ai-response-toolbar">
           <div class="view-toggle">
-            <button id="aiViewText" class="view-btn active" title="Plain text view">Text</button>
-            <button id="aiViewMarkdown" class="view-btn" title="Rendered Markdown view">Markdown</button>
+            <button id="aiViewText" class="view-btn active" data-i18n-title="ai.viewText" title="Plain text view" data-i18n="ai.viewText">Text</button>
+            <button id="aiViewMarkdown" class="view-btn" data-i18n-title="ai.viewMarkdown" title="Rendered Markdown view" data-i18n="ai.viewMarkdown">Markdown</button>
           </div>
         </div>
         <div id="aiThinking" class="ai-thinking" hidden></div>
@@ -191,25 +201,26 @@
 
       <!-- Auto-annotate -->
       <details class="ai-section">
-        <summary>Auto-Annotate</summary>
+        <summary data-i18n="ai.autoAnnotate">Auto-Annotate</summary>
         <div class="ai-form">
-          <p class="hint">AI finds the most important passages and creates highlight annotations automatically.</p>
-          <label>Desired annotations (optional)
-            <input type="number" id="aiAutoHowMany" placeholder="leave empty = AI decides" min="1" max="50" />
+          <p class="hint" data-i18n="ai.autoHint">AI finds the most important passages and creates highlight annotations automatically.</p>
+          <label><span data-i18n="ai.autoHowMany">Desired annotations (optional)</span>
+            <input type="number" id="aiAutoHowMany" data-i18n-placeholder="ai.autoHowManyPlaceholder" placeholder="leave empty = AI decides" min="1" max="50" />
           </label>
-          <label class="check"><input type="checkbox" id="aiAutoNotes" checked /> Include notes</label>
+          <label class="check"><input type="checkbox" id="aiAutoNotes" checked /> <span data-i18n="ai.autoNotes">Include notes</span></label>
           <details class="ai-subsection">
-            <summary>Prompt Template</summary>
+            <summary data-i18n="ai.autoTemplate">Prompt Template</summary>
             <textarea id="aiAutoTemplate" rows="10"
+              data-i18n-placeholder="ai.autoTemplatePlaceholder"
               placeholder="Template is empty — the built-in default will be used."></textarea>
             <div class="ai-subsection-actions">
-              <button id="aiAutoResetTpl" class="small">Reset to default</button>
+              <button id="aiAutoResetTpl" class="small" data-i18n="ai.autoResetTpl">Reset to default</button>
             </div>
             <p class="hint">Placeholders: <code>$howMany</code> (count instruction), <code>$formatLine</code> (JSON element format), <code>$pageText</code> (page text content). Edit the text above to customize.</p>
           </details>
           <div class="row">
-            <button id="aiAutoRun" class="primary">Annotate</button>
-            <button id="aiAutoStop" class="danger" hidden>Stop</button>
+            <button id="aiAutoRun" class="primary" data-i18n="ai.autoRun">Annotate</button>
+            <button id="aiAutoStop" class="danger" hidden data-i18n="ai.stop">Stop</button>
           </div>
           <div id="aiAutoStatus" class="ai-status"></div>
         </div>
@@ -217,11 +228,11 @@
 
       <!-- Debug -->
       <details class="ai-section">
-        <summary>Debug <span class="debug-badge" id="aiDebugBadge" hidden>0</span></summary>
+        <summary><span data-i18n="ai.debug">Debug</span> <span class="debug-badge" id="aiDebugBadge" hidden>0</span></summary>
         <div class="ai-debug-wrap">
           <div class="ai-debug-toolbar">
-            <button id="aiDebugClear" class="small">Clear</button>
-            <label class="check small"><input type="checkbox" id="aiDebugAutoScroll" checked /> Auto-scroll</label>
+            <button id="aiDebugClear" class="small" data-i18n="ai.clear">Clear</button>
+            <label class="check small"><input type="checkbox" id="aiDebugAutoScroll" checked /> <span data-i18n="ai.autoScroll">Auto-scroll</span></label>
           </div>
           <div id="aiDebugLog" class="ai-debug-log"></div>
         </div>
@@ -234,6 +245,7 @@
 
   <!-- ===== Scripts (classic, load order matters) ===== -->
   <script src="lib/pdf.min.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/pdf-viewer.js"></script>
   <script src="js/highlighter.js"></script>

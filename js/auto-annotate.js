@@ -20,19 +20,8 @@ const AutoAnnotate = (() => {
   //   $howMany    — instruction for number of passages
   //   $formatLine — JSON element format instruction
   //   $pageText   — the extracted page text
-  const DEFAULT_AUTO_PROMPT = [
-    'You are analyzing the text content of a PDF page.',
-    'Identify the most important passages worth highlighting.',
-    '$howMany',
-    '',
-    'CRITICAL RULES:',
-    '1. The "text" value MUST be copied VERBATIM from the page text below (do not paraphrase, do not summarize).',
-    '2. Return ONLY a JSON array. No markdown fences, no commentary, no prose.',
-    '3. $formatLine',
-    '',
-    'Page text:',
-    '$pageText',
-  ].join('\n');
+  // Uses i18n so the default prompt matches the UI language.
+  const DEFAULT_AUTO_PROMPT = I18N.t('ai.defaultAutoPrompt');
 
   let abortController = null;
 
@@ -54,13 +43,13 @@ const AutoAnnotate = (() => {
     abortController = new AbortController();
     const settings = callbacks.getSettings ? callbacks.getSettings() : {};
     if (!settings.model) {
-      if (callbacks.onError) callbacks.onError('No AI model configured. Open the AI panel and set a model.');
+      if (callbacks.onError) callbacks.onError(I18N.t('auto.noModel'));
       return;
     }
 
     const pages = opts.pages || [];
     if (pages.length === 0) {
-      if (callbacks.onError) callbacks.onError('No page text to annotate.');
+      if (callbacks.onError) callbacks.onError(I18N.t('auto.noPageText'));
       return;
     }
 
@@ -183,7 +172,7 @@ const AutoAnnotate = (() => {
       : 'Each element MUST be: {"text": "<exact excerpt copied verbatim from the page>"}';
 
     const ctx = pdfContext && pdfContext.trim() ? pdfContext.trim() : '';
-    const tmpl = (template && template.trim()) ? template.trim() : DEFAULT_AUTO_PROMPT;
+    const tmpl = (template && template.trim()) ? template.trim() : I18N.t('ai.defaultAutoPrompt');
     return tmpl
       .replace(/\$howMany/g, countLine)
       .replace(/\$formatLine/g, formatLine)
