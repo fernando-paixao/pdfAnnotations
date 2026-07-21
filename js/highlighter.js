@@ -16,7 +16,7 @@ const Highlighter = (() => {
   const byPage = new Map();
   // id -> annotation (for quick lookup)
   const byId = new Map();
-  let currentPdfId = null;
+  let currentNamespaceId = null;
   let activeAnnotationId = null; // annotation being edited in popover
 
   const callbacks = {
@@ -63,7 +63,9 @@ const Highlighter = (() => {
     });
   }
 
-  function setPdfId(id) { currentPdfId = id; }
+  function setNamespaceId(id) { currentNamespaceId = id; }
+  // Legacy alias
+  function setPdfId(id) { currentNamespaceId = id; }
 
   function setAnnotations(anns) {
     byPage.clear();
@@ -158,7 +160,7 @@ const Highlighter = (() => {
     highlightBtn.hidden = true;
 
     const data = {
-      pdfId: currentPdfId,
+      namespaceId: currentNamespaceId,
       page,
       textSelected,
       rects,
@@ -304,7 +306,7 @@ const Highlighter = (() => {
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   return {
-    init, setPdfId, setAnnotations, redrawPage, drawAnnotation,
+    init, setNamespaceId, setPdfId, setAnnotations, redrawPage, drawAnnotation,
     refreshAnnotation, removeAnnotationDraw, flashAnnotation, clear,
     callbacks,
   };

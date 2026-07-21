@@ -228,6 +228,39 @@ button.danger:hover { background: var(--danger); color: #fff; }
   flex-direction: column;
   overflow: hidden;
 }
+
+/* Namespace selector */
+.namespace-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.namespace-bar select {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.namespace-bar select:focus { outline: none; border-color: var(--accent); }
+.ns-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-dim);
+  line-height: 1;
+}
+.ns-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ns-btn.danger:hover { background: var(--danger); border-color: var(--danger); }
 .panel-header {
   display: flex;
   align-items: center;

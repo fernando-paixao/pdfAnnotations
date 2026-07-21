@@ -79,7 +79,7 @@ const AutoAnnotate = (() => {
       if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
       debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
 
-      const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate);
+      const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate, opts.pdfContext);
       debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
       const messages = [];
       if (settings.systemPrompt && settings.systemPrompt.trim()) {
@@ -146,7 +146,7 @@ const AutoAnnotate = (() => {
         const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp);
         if (!rects.length) { skipped++; debug('AUTO', 'Page ' + pg.page + ': matched but no rects'); continue; }
         const data = {
-          pdfId: HighlighterCurrentPdfId(),
+          namespaceId: HighlighterCurrentNamespaceId(),
           page: pg.page,
           textSelected: snippet.length > 200 ? snippet.slice(0, 200) + '…' : snippet,
           rects,
@@ -173,7 +173,7 @@ const AutoAnnotate = (() => {
   }
 
   /* ---------- Prompt building ---------- */
-  function buildPrompt(pageText, howMany, includeNotes, template) {
+  function buildPrompt(pageText, howMany, includeNotes, template, pdfContext) {
     const countLine = howMany && howMany > 0
       ? 'Return exactly ' + howMany + ' of the most important passages.'
       : 'Return the most important passages (as many as you judge relevant).';
@@ -182,10 +182,12 @@ const AutoAnnotate = (() => {
       ? 'Each element MUST be: {"text": "<exact excerpt copied verbatim from the page>", "note": "<a few words explaining why it matters>"}'
       : 'Each element MUST be: {"text": "<exact excerpt copied verbatim from the page>"}';
 
+    const ctx = pdfContext && pdfContext.trim() ? pdfContext.trim() : '';
     const tmpl = (template && template.trim()) ? template.trim() : DEFAULT_AUTO_PROMPT;
     return tmpl
       .replace(/\$howMany/g, countLine)
       .replace(/\$formatLine/g, formatLine)
+      .replace(/\$pdfContext/g, ctx)
       .replace(/\$pageText/g, pageText);
   }
 
@@ -215,9 +217,9 @@ const AutoAnnotate = (() => {
   }
 
   // Placeholder — replaced by app.js wiring to avoid circular dep
-  let _pdfId = null;
-  function setPdfId(id) { _pdfId = id; }
-  function HighlighterCurrentPdfId() { return _pdfId; }
+  let _namespaceId = null;
+  function setNamespaceId(id) { _namespaceId = id; }
+  function HighlighterCurrentNamespaceId() { return _namespaceId; }
 
-  return { init, run, abort, setPdfId, callbacks, DEFAULT_AUTO_PROMPT };
+  return { init, run, abort, setNamespaceId, callbacks, DEFAULT_AUTO_PROMPT };
 })();

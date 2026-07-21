@@ -70,6 +70,13 @@
         <h2>Annotations</h2>
         <span id="annotationCount" class="count">0</span>
       </div>
+      <!-- Namespace selector -->
+      <div class="namespace-bar" id="namespaceBar" hidden>
+        <select id="namespaceSelect" title="Select namespace"></select>
+        <button id="nsCreate" class="ns-btn" title="Create new namespace">+</button>
+        <button id="nsRename" class="ns-btn" title="Rename namespace">✎</button>
+        <button id="nsDelete" class="ns-btn danger" title="Delete namespace">🗑</button>
+      </div>
       <input type="text" id="searchBox" placeholder="Search annotations…" hidden />
       <ul id="annotationList" class="annotation-list"></ul>
       <div id="emptyAnnotations" class="empty-annotations">
@@ -140,9 +147,15 @@
               placeholder="e.g. You are a helpful assistant that analyzes PDF documents. Answer concisely."></textarea>
             <p class="hint">Sent as a <code>role: system</code> message before your prompt.</p>
           </details>
+          <details class="ai-subsection">
+            <summary>PDF Context (optional)</summary>
+            <textarea id="aiPdfContext" rows="3"
+              placeholder="e.g. This is a research paper about quantum computing published in 2024. The author discusses…"></textarea>
+            <p class="hint">Background info injected into your prompt via <code>$pdfContext</code>.</p>
+          </details>
           <textarea id="aiPromptTemplate" rows="4"
-            placeholder="Write your prompt. Use $text where the PDF context goes."></textarea>
-          <p class="hint">Use <code>$text</code> as the placeholder for the PDF context.</p>
+            placeholder="Write your prompt. Use $text where the PDF page text goes."></textarea>
+          <p class="hint">Placeholders: <code>$text</code> (page text), <code>$pdfContext</code> (your context above).</p>
           <label>Context scope
             <select id="aiContextScope">
               <option value="selectedText">Selected text</option>

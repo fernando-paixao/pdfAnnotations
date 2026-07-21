@@ -8,6 +8,8 @@
   let currentFileName = '';
   let currentAnnotations = [];
   let currentPage = 1;
+  let currentNamespaceId = null;
+  let currentNamespaces = [];
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
@@ -28,6 +30,11 @@
   const pdfSearch = $('pdfSearch');
   const searchCount = $('searchCount');
   const toastEl = $('toast');
+  const namespaceBar = $('namespaceBar');
+  const namespaceSelect = $('namespaceSelect');
+  const nsCreateBtn = $('nsCreate');
+  const nsRenameBtn = $('nsRename');
+  const nsDeleteBtn = $('nsDelete');
 
   // ---------- Helpers ----------
   function uuid() {
@@ -76,7 +83,7 @@
   Highlighter.init(viewer, $('highlightBtn'), $('editorPopover'));
   Highlighter.callbacks.createAnnotation = async (data) => {
     const now = Date.now();
-    const ann = { ...data, id: uuid(), createdAt: now, updatedAt: now };
+    const ann = { ...data, id: uuid(), namespaceId: currentNamespaceId, createdAt: now, updatedAt: now };
     await Storage.addAnnotation(ann);
     currentAnnotations.push(ann);
     return ann;
@@ -124,7 +131,7 @@
   // ---------- Shared annotation creation helper ----------
   async function createAnnotationRecord(data) {
     const now = Date.now();
-    const ann = { ...data, id: uuid(), createdAt: now, updatedAt: now };
+    const ann = { ...data, id: uuid(), namespaceId: currentNamespaceId, createdAt: now, updatedAt: now };
     await Storage.addAnnotation(ann);
     currentAnnotations.push(ann);
     return ann;
@@ -152,7 +159,7 @@
   AIPanel.callbacks.getPageText = getPageText;
   AIPanel.callbacks.onAutoAnnotate = (opts) => {
     if (opts.abort) { AutoAnnotate.abort(); return; }
-    AutoAnnotate.setPdfId(currentPdfId);
+    AutoAnnotate.setNamespaceId(currentNamespaceId);
     AutoAnnotate.run(opts);
   };
 
@@ -189,6 +196,78 @@
     AIPanel.debugLog(category, message, data);
   };
 
+  // ---------- Namespace management ----------
+  async function selectNamespace(nsId) {
+    currentNamespaceId = nsId;
+    Highlighter.setNamespaceId(nsId);
+    const anns = await Storage.getAnnotationsByNamespace(nsId);
+    currentAnnotations = anns.slice();
+    Highlighter.clear();
+    Highlighter.setAnnotations(currentAnnotations);
+    refreshUI();
+    redrawVisiblePages();
+    updateNamespaceSelector();
+    showToast(anns.length + ' annotation(s) in "' + (currentNamespaces.find(n => n.id === nsId) || {}).name + '"');
+  }
+
+  async function createNamespace(name) {
+    const nsName = (name || '').trim() || 'New Namespace';
+    const ns = {
+      id: 'ns_' + uuid(),
+      name: nsName,
+      pdfId: currentPdfId,
+      pdfName: currentFileName,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await Storage.createNamespace(ns);
+    currentNamespaces.push(ns);
+    await selectNamespace(ns.id);
+  }
+
+  async function renameNamespace(nsId) {
+    const ns = currentNamespaces.find(n => n.id === nsId);
+    if (!ns) return;
+    const newName = prompt('Rename namespace:', ns.name);
+    if (newName === null) return; // cancelled
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === ns.name) return;
+    ns.name = trimmed;
+    ns.updatedAt = Date.now();
+    await Storage.updateNamespace(ns);
+    updateNamespaceSelector();
+    showToast('Renamed to "' + trimmed + '"');
+  }
+
+  async function deleteNamespace(nsId) {
+    const ns = currentNamespaces.find(n => n.id === nsId);
+    if (!ns) return;
+    if (currentNamespaces.length <= 1) {
+      showToast('Cannot delete the last namespace');
+      return;
+    }
+    if (!confirm('Delete namespace "' + ns.name + '" and all its annotations?')) return;
+    await Storage.deleteNamespaceAndAnnotations(nsId);
+    currentNamespaces = currentNamespaces.filter(n => n.id !== nsId);
+    if (currentNamespaceId === nsId) {
+      await selectNamespace(currentNamespaces[0].id);
+    } else {
+      updateNamespaceSelector();
+    }
+    showToast('Namespace deleted');
+  }
+
+  function updateNamespaceSelector() {
+    namespaceSelect.innerHTML = '';
+    currentNamespaces.forEach((ns) => {
+      const opt = document.createElement('option');
+      opt.value = ns.id;
+      opt.textContent = ns.name;
+      if (ns.id === currentNamespaceId) opt.selected = true;
+      namespaceSelect.appendChild(opt);
+    });
+  }
+
   // ---------- Load PDF ----------
   async function loadPdfFile(file) {
     if (!file) return;
@@ -196,34 +275,53 @@
       showToast('Loading PDF…');
       currentFileName = file.name;
 
-      // 1) Stable id + load existing annotations BEFORE rendering pages
+      // 1) Stable PDF id
       const pdfId = await Storage.hashFile(file);
       currentPdfId = pdfId;
-      const existing = await Storage.getAnnotationsByPdf(pdfId);
-      currentAnnotations = existing.slice();
 
-      Highlighter.clear();
-      Highlighter.setPdfId(pdfId);
-      Highlighter.setAnnotations(currentAnnotations);
+      // 2) Migrate old annotations (v1 format with pdfId but no namespaceId)
+      const migratedNs = await Storage.migrateOldAnnotations(pdfId, file.name);
+
+      // 3) Load namespaces for this PDF
+      currentNamespaces = await Storage.getNamespacesByPdf(pdfId);
+
+      // If no namespaces exist, create a default one
+      if (currentNamespaces.length === 0) {
+        const defaultNs = {
+          id: 'ns_' + uuid(),
+          name: 'default',
+          pdfId,
+          pdfName: file.name,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await Storage.createNamespace(defaultNs);
+        currentNamespaces.push(defaultNs);
+      }
+
+      // 4) Select namespace — prefer migrated one, else first
+      const selectNs = migratedNs || currentNamespaces[0];
+      await selectNamespace(selectNs.id);
+
       Search.reset();
-      refreshUI();
 
-      // 2) Render the PDF
+      // 5) Render the PDF
       const buffer = await file.arrayBuffer();
       emptyState.style.display = 'none';
       await PDFViewer.loadArrayBuffer(buffer);
 
-      // 3) UI state
+      // 6) UI state
       pdfName.textContent = file.name;
       navGroup.hidden = false;
       zoomGroup.hidden = false;
       dataGroup.hidden = false;
       searchGroup.hidden = false;
+      namespaceBar.hidden = false;
+      searchBox.hidden = false;
       zoomLevel.textContent = Math.round(PDFViewer.getScale() * 100) + '%';
       await Storage.savePdfMeta({
         pdfId, fileName: file.name, numPages: PDFViewer.getNumPages(), lastOpened: Date.now(),
       });
-      showToast(existing.length + ' annotation(s) loaded');
     } catch (err) {
       console.error(err);
       showToast('Failed to load PDF: ' + (err && err.message ? err.message : err));
@@ -234,6 +332,21 @@
     const f = e.target.files && e.target.files[0];
     if (f) loadPdfFile(f);
     fileInput.value = ''; // allow re-picking same file
+  });
+
+  // ---------- Namespace UI events ----------
+  namespaceSelect.addEventListener('change', () => {
+    if (namespaceSelect.value) selectNamespace(namespaceSelect.value);
+  });
+  nsCreateBtn.addEventListener('click', () => {
+    const name = prompt('New namespace name:', '');
+    if (name !== null) createNamespace(name);
+  });
+  nsRenameBtn.addEventListener('click', () => {
+    if (currentNamespaceId) renameNamespace(currentNamespaceId);
+  });
+  nsDeleteBtn.addEventListener('click', () => {
+    if (currentNamespaceId) deleteNamespace(currentNamespaceId);
   });
 
   // ---------- Toolbar ----------
@@ -255,9 +368,11 @@
 
   // ---------- Export / Import ----------
   $('exportBtn').addEventListener('click', () => {
-    if (!currentPdfId) return;
+    if (!currentNamespaceId) return;
+    const ns = currentNamespaces.find(n => n.id === currentNamespaceId);
     const payload = {
-      pdfId: currentPdfId,
+      namespaceId: currentNamespaceId,
+      namespaceName: ns ? ns.name : '',
       fileName: currentFileName,
       exportedAt: Date.now(),
       annotations: currentAnnotations,
@@ -266,7 +381,8 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'annotations-' + (currentFileName.replace(/\.pdf$/i, '') || currentPdfId.slice(0, 8)) + '.json';
+    const nsName = ns ? ns.name : 'annotations';
+    a.download = 'annotations-' + nsName.replace(/[^a-z0-9_-]/gi, '_') + '.json';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -277,7 +393,7 @@
   importInput.addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0];
     importInput.value = '';
-    if (!f || !currentPdfId) return;
+    if (!f || !currentNamespaceId) return;
     try {
       const text = await f.text();
       const parsed = JSON.parse(text);
@@ -287,7 +403,7 @@
         if (!a || !a.rects || !a.page) continue;
         const ann = {
           id: a.id || uuid(),
-          pdfId: currentPdfId,
+          namespaceId: currentNamespaceId,
           page: a.page,
           textSelected: a.textSelected || '',
           rects: a.rects,
@@ -299,7 +415,7 @@
         await Storage.updateAnnotation(ann); // upsert
         added++;
       }
-      currentAnnotations = await Storage.getAnnotationsByPdf(currentPdfId);
+      currentAnnotations = await Storage.getAnnotationsByNamespace(currentNamespaceId);
       Highlighter.setAnnotations(currentAnnotations);
       refreshUI();
       redrawVisiblePages();

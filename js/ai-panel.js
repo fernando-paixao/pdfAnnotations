@@ -16,6 +16,7 @@ const AIPanel = (() => {
     streaming: true,
     soundEnabled: true,
     systemPrompt: '',
+    pdfContext: '',
     contextScope: 'entirePage',
     pageCount: 1,
     promptTemplate: 'Summarize the key points of the following text:\n\n$text',
@@ -77,6 +78,7 @@ const AIPanel = (() => {
     els.streaming = $('aiStreaming');
     els.soundEnabled = $('aiSoundEnabled');
     els.systemPrompt = $('aiSystemPrompt');
+    els.pdfContext = $('aiPdfContext');
     els.promptTemplate = $('aiPromptTemplate');
     els.contextScope = $('aiContextScope');
     els.pageCount = $('aiPageCount');
@@ -113,6 +115,7 @@ const AIPanel = (() => {
     els.streaming.checked = settings.streaming;
     els.soundEnabled.checked = settings.soundEnabled;
     els.systemPrompt.value = settings.systemPrompt;
+    els.pdfContext.value = settings.pdfContext;
     els.promptTemplate.value = settings.promptTemplate;
     els.contextScope.value = settings.contextScope;
     els.pageCount.value = settings.pageCount;
@@ -131,6 +134,7 @@ const AIPanel = (() => {
     settings.streaming = els.streaming.checked;
     settings.soundEnabled = els.soundEnabled.checked;
     settings.systemPrompt = els.systemPrompt.value;
+    settings.pdfContext = els.pdfContext.value;
     settings.promptTemplate = els.promptTemplate.value;
     settings.contextScope = els.contextScope.value;
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
@@ -152,7 +156,7 @@ const AIPanel = (() => {
     });
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
-     els.systemPrompt, els.contextScope, els.pageCount, els.autoHowMany,
+     els.systemPrompt, els.pdfContext, els.contextScope, els.pageCount, els.autoHowMany,
      els.autoTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
@@ -266,7 +270,12 @@ const AIPanel = (() => {
       ? 'Queuing… (gathering context)'
       : 'Gathering context…';
     const ctx = await gatherContext();
-    const prompt = settings.promptTemplate.replace(/\$text/g, ctx.text);
+    const pdfCtx = settings.pdfContext && settings.pdfContext.trim()
+      ? settings.pdfContext.trim()
+      : '';
+    const prompt = settings.promptTemplate
+      .replace(/\$pdfContext/g, pdfCtx)
+      .replace(/\$text/g, ctx.text);
     const messages = [];
     if (settings.systemPrompt && settings.systemPrompt.trim()) {
       messages.push({ role: 'system', content: settings.systemPrompt.trim() });
@@ -497,6 +506,7 @@ const AIPanel = (() => {
           howMany: howMany && howMany > 0 ? howMany : null,
           includeNotes: settings.includeNotes,
           promptTemplate: settings.autoAnnotateTemplate,
+          pdfContext: settings.pdfContext,
           pages: ctx.pages,
         });
       }

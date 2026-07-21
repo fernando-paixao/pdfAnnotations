@@ -89,4 +89,18 @@ And add a sound to be played while each action queued is completed.
 ---
 Can you add a feature optional advanced features:
 
-- Let the user modify 
+- Let the user modify the template of prompt to Auto-Annotate:
+
+*You can add placeholders instead of the actual variables on this part
+
+Now it is:
+
+You are analyzing the text content of a PDF page.\nIdentify the most important passages worth highlighting.\nReturn the most important passages (as many as you judge relevant).\n\nCRITICAL RULES:\n1. The \"text\" value MUST be copied VERBATIM from the page text below (do not paraphrase, do not summarize).\n2. Return ONLY a JSON array. No markdown fences, no commentary, no prose.\n3. Each element MUST be: {\"text\": \"<exact excerpt copied verbatim from the page>
+--- Output AI
+[{"text": "fundou em 387 a Academia", "reasoning": "This marks the pivotal moment when Plato established his philosophical institution, laying the foundation for what became the Academy."}, {"text": "estudou com os ensinos eleáticos e pitagóricos através de Platão", "reasoning": "Contextualizes the influence of other schools on Plato's life and philosophy before he founded the academy."}]
+---
+Can you add I18N with support to brazilian portuguese and english
+
+*Don't forget to change the default prompt texts that we give to AI
+*The placeholders can be kept in english to maintain uniform
+---
