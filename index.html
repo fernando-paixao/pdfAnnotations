@@ -230,6 +230,21 @@
       <details class="ai-section">
         <summary><span data-i18n="ai.debug">Debug</span> <span class="debug-badge" id="aiDebugBadge" hidden>0</span></summary>
         <div class="ai-debug-wrap">
+          <!-- Test Matching -->
+          <details class="ai-subsection">
+            <summary>Test Matching</summary>
+            <div class="ai-form">
+              <label><span>PDF Text</span>
+                <textarea id="aiTestPdfText" rows="5" placeholder="Paste PDF page text here…"></textarea>
+              </label>
+              <label><span>AI Response (JSON)</span>
+                <textarea id="aiTestAiJson" rows="5" placeholder='Paste AI JSON response here, e.g. [{"text": "important passage", "note": "why"}]'></textarea>
+              </label>
+              <div class="ai-subsection-actions">
+                <button id="aiTestMatch" class="primary small">Test Matching</button>
+              </div>
+            </div>
+          </details>
           <div class="ai-debug-toolbar">
             <button id="aiDebugClear" class="small" data-i18n="ai.clear">Clear</button>
             <label class="check small"><input type="checkbox" id="aiDebugAutoScroll" checked /> <span data-i18n="ai.autoScroll">Auto-scroll</span></label>

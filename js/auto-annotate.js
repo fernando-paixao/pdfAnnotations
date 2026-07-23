@@ -123,7 +123,33 @@ const AutoAnnotate = (() => {
         total++;
         const snippet = (p.text || '').trim();
         if (!snippet) { skipped++; debug('AUTO', 'Page ' + pg.page + ': empty snippet, skipped'); continue; }
-        const range = TextGeometry.findSnippetRange(idx, snippet);
+        const range = TextGeometry.findSnippetRange(idx, snippet, (info) => {
+          if (info.type === 'fuzzy-start') {
+            debug('FUZZY', 'Page ' + pg.page + ': strategies 1-3 failed, attempting fuzzy match', {
+              aiOriginal: info.aiOriginal,
+              aiStripped: info.aiStripped,
+              aiWords: info.aiWordCount,
+              pdfWords: info.pdfWordCount,
+            });
+          } else if (info.type === 'fuzzy-match') {
+            debug('FUZZY', 'Page ' + pg.page + ': FUZZY MATCH (score=' + info.score.toFixed(2) +
+              ', ' + info.matchedWords + '/' + info.totalAiWords + ' words, ' + info.skips + ' skips)', {
+              score: info.score,
+              matchedWords: info.matchedWords + '/' + info.totalAiWords,
+              skips: info.skips,
+              skippedAiWords: info.skippedAiWords,
+              pdfMatchedRegion: info.pdfMatchedRegion,
+              pdfMatchedStripped: info.pdfMatchedStripped,
+            });
+          } else if (info.type === 'fuzzy-no-match') {
+            debug('FUZZY', 'Page ' + pg.page + ': fuzzy match failed — ' + info.reason, {
+              aiWordCount: info.aiWordCount,
+              maxSkips: info.maxSkips,
+            });
+          } else if (info.type === 'fuzzy-reject') {
+            debug('FUZZY', 'Page ' + pg.page + ': fuzzy match rejected — ' + info.reason);
+          }
+        });
         if (!range) {
           skipped++;
           debug('AUTO', 'Page ' + pg.page + ': NO MATCH (score below threshold)',
@@ -180,17 +206,66 @@ const AutoAnnotate = (() => {
       .replace(/\$pageText/g, pageText);
   }
 
-  /* ---------- JSON parsing (robust) ---------- */
+  /* ---------- JSON parsing (robust, multi-stage) ---------- */
+
+  /** Curly/smart quote characters to strip from text values. */
+  const WRAPPING_QUOTES = "['\"\u201C\u201D\u00AB\u00BB]";
+
+  /**
+   * Parse AI response into passages [{text, note}].
+   * Uses a 3-stage fallback to handle malformed JSON from LLMs:
+   *   Stage 1: Direct JSON.parse (fast path for well-formed output)
+   *   Stage 2: JSON repair (fix escaped keys, single quotes) + parse
+   *   Stage 3: Regex-based extraction (last resort)
+   * All stages post-process values to strip wrapping quotes.
+   */
   function parsePassages(raw) {
     if (!raw) return [];
     let text = raw.trim();
     // Strip markdown code fences if present
     text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+
     // Extract the outermost JSON array
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
-    if (start < 0 || end < 0 || end <= start) return [];
+    if (start < 0 || end < 0 || end <= start) {
+      // No array brackets — try regex extraction directly
+      const result = cleanPassages(parsePassagesRegex(text));
+      if (result.length > 0) debug('PARSE', 'Regex fallback (no array brackets): ' + result.length + ' passage(s)');
+      return result;
+    }
     const jsonStr = text.slice(start, end + 1);
+
+    // Stage 1: Direct JSON.parse
+    let passages = tryJsonParse(jsonStr);
+    if (passages.length > 0) {
+      debug('PARSE', 'Stage 1 (direct parse): ' + passages.length + ' passage(s)');
+      return cleanPassages(passages);
+    }
+
+    // Stage 2: Repair common JSON errors and retry
+    const repaired = repairJson(jsonStr);
+    if (repaired !== jsonStr) {
+      passages = tryJsonParse(repaired);
+      if (passages.length > 0) {
+        debug('PARSE', 'Stage 2 (repaired JSON): ' + passages.length + ' passage(s)');
+        return cleanPassages(passages);
+      }
+    }
+
+    // Stage 3: Regex-based extraction (last resort)
+    // Use repaired string if available — fixes like \"note\" → "note" help regex too
+    var regexInput = repaired !== jsonStr ? repaired : jsonStr;
+    passages = cleanPassages(parsePassagesRegex(regexInput));
+    debug('PARSE', 'Stage 3 (regex fallback): ' + passages.length + ' passage(s)', jsonStr.length > 300 ? jsonStr.slice(0, 300) + '\u2026' : jsonStr);
+    return passages;
+  }
+
+  /**
+   * Try JSON.parse and map to {text, note} format.
+   * Returns [] on any error.
+   */
+  function tryJsonParse(jsonStr) {
     try {
       const arr = JSON.parse(jsonStr);
       if (!Array.isArray(arr)) return [];
@@ -205,10 +280,129 @@ const AutoAnnotate = (() => {
     }
   }
 
+  /**
+   * Attempt to repair common JSON errors produced by LLMs:
+   *   - Escaped keys inside string values: \"note\" → "note"
+   *   - Single-quote delimiters around known keys: 'text': → "text":
+   *   - Trailing commas before } or ]
+   *   - Unescaped control characters inside strings
+   */
+  function repairJson(jsonStr) {
+    let s = jsonStr;
+    // Fix escaped JSON keys: \"text\" → "text", \"note\" → "note", etc.
+    s = s.replace(/\\"(text|note|reason|why|excerpt|title)\\"/g, '"$1"');
+    // Replace single-quote delimiters around known keys: 'text': → "text":
+    s = s.replace(/'(text|note|reason|why|excerpt|title)'(\s*:)/g, '"$1"$2');
+    // Remove trailing commas before } or ]
+    s = s.replace(/,(\s*[}\]])/g, '$1');
+    return s;
+  }
+
+  /**
+   * Last-resort regex-based extraction of passages from malformed JSON.
+   * Splits into object-like chunks and extracts text/note fields.
+   */
+  function parsePassagesRegex(str) {
+    const passages = [];
+    // Split into chunks at object boundaries: }, { or },{ or },\n{
+    const chunks = str.split(/\}\s*,\s*\{/);
+    for (let chunk of chunks) {
+      const textVal = extractFieldValue(chunk, 'text') || extractFieldValue(chunk, 'excerpt');
+      if (!textVal || textVal.trim().length < 4) continue;
+      const noteVal = extractFieldValue(chunk, 'note')
+        || extractFieldValue(chunk, 'reason')
+        || extractFieldValue(chunk, 'why')
+        || '';
+      passages.push({ text: textVal, note: noteVal });
+    }
+    return passages;
+  }
+
+  /** Regex source fragment matching an optional single or double quote. */
+  var QQ = "['\"]"; // safe in double-quoted string
+
+  /**
+   * Extract a field value from a JSON-like chunk.
+   * Handles double quotes, single quotes, and smart quotes.
+   * Captures everything between the opening delimiter and the next
+   * field key or closing brace.
+   */
+  function extractFieldValue(chunk, fieldName) {
+    // Build regex to find the key: "field": or 'field': or \"field\":
+    var keyRe = new RegExp(QQ + '?' + fieldName + QQ + '?\\s*:\\s*(' + QQ + ')', 'i');
+    var keyMatch = chunk.match(keyRe);
+    if (keyMatch) {
+      var quoteChar = keyMatch[1];
+      var startIdx = keyMatch.index + keyMatch[0].length;
+      // Scan for the matching closing quote (not escaped)
+      for (var i = startIdx; i < chunk.length; i++) {
+        if (chunk[i] === quoteChar && chunk[i - 1] !== '\\') {
+          // Verify this is a real closing quote: next non-space char
+          // should be , } ] or another key
+          var after = chunk.slice(i + 1);
+          if (/^\s*[,}\]]/.test(after) ||
+              new RegExp('^\\s*,\\s*' + QQ + '?(?:note|reason|why|text|excerpt|title)' + QQ + '?\\s*:', 'i').test(after)) {
+            return unescapeValue(chunk.slice(startIdx, i));
+          }
+        }
+      }
+      // No proper closing quote — take until next key or }
+      var remainder = chunk.slice(startIdx);
+      var stopRe = new RegExp(',?\\s*' + QQ + '?(?:note|reason|why|excerpt|title)' + QQ + '?\\s*:|\\}', 'i');
+      var stopIdx = remainder.search(stopRe);
+      if (stopIdx >= 0) return unescapeValue(remainder.slice(0, stopIdx).trim());
+      return unescapeValue(remainder.replace(/\}.*$/, '').trim());
+    }
+    // Fallback: capture everything after key: until next known key or }
+    var fallbackRe = new RegExp(
+      QQ + '?' + fieldName + QQ + '?\\s*:\\s*' +
+      '([\\s\\S]*?)(?=,\\s*' + QQ + '?(?:note|reason|why|text|excerpt|title)' + QQ + '?\\s*:|\\})',
+      'i'
+    );
+    var fbMatch = chunk.match(fallbackRe);
+    if (fbMatch) {
+      var val = fbMatch[1].trim();
+      val = val.replace(new RegExp('^' + WRAPPING_QUOTES + '+|' + WRAPPING_QUOTES + '+$', 'g'), '');
+      return unescapeValue(val);
+    }
+    return null;
+  }
+
+  /**
+   * Unescape JSON string escape sequences in a value.
+   */
+  function unescapeValue(val) {
+    return val
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\')
+      .trim();
+  }
+
+  /**
+   * Post-process passages: strip wrapping quotation marks from text values.
+   * LLMs often wrap the excerpt in extra quotes like: "text": "\"passage\""
+   */
+  function cleanPassages(arr) {
+    const stripRe = new RegExp('^' + WRAPPING_QUOTES + '+|' + WRAPPING_QUOTES + '+$', 'g');
+    return arr.map((p) => {
+      let text = (p.text || '').trim();
+      // Iteratively strip wrapping quotes (handles ""text"" double-wrapping)
+      let prev;
+      do { prev = text; text = text.replace(stripRe, ''); } while (text !== prev);
+      return {
+        text: text.trim(),
+        note: (p.note || '').trim(),
+      };
+    }).filter((p) => p.text.length > 3);
+  }
+
   // Placeholder — replaced by app.js wiring to avoid circular dep
   let _namespaceId = null;
   function setNamespaceId(id) { _namespaceId = id; }
   function HighlighterCurrentNamespaceId() { return _namespaceId; }
 
-  return { init, run, abort, setNamespaceId, callbacks, DEFAULT_AUTO_PROMPT };
+  return { init, run, abort, setNamespaceId, callbacks, DEFAULT_AUTO_PROMPT, parsePassages };
 })();

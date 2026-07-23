@@ -803,6 +803,9 @@ body.ai-open .ai-backdrop {
 .debug-tag-AUTO  { background: #9c36b5; color: #fff; }
 .debug-tag-ERR   { background: #e03131; color: #fff; }
 .debug-tag-INFO  { background: #495057; color: #fff; }
+.debug-tag-TEST  { background: #1c7ed6; color: #fff; }
+.debug-tag-FUZZY { background: #f08c00; color: #fff; }
+.debug-tag-PARSE { background: #0ca678; color: #fff; }
 .debug-data {
   display: block;
   margin-top: 2px;

@@ -104,6 +104,9 @@ const AIPanel = (() => {
     els.debugClear = $('aiDebugClear');
     els.debugBadge = $('aiDebugBadge');
     els.debugAutoScroll = $('aiDebugAutoScroll');
+    els.testPdfText = $('aiTestPdfText');
+    els.testAiJson = $('aiTestAiJson');
+    els.testMatch = $('aiTestMatch');
   }
 
   function applySettingsToUI() {
@@ -182,6 +185,7 @@ const AIPanel = (() => {
       collectSettings();
     });
     els.debugClear.addEventListener('click', clearDebug);
+    els.testMatch.addEventListener('click', onTestMatch);
   }
 
   /* ---------- Fetch models ---------- */
@@ -561,6 +565,90 @@ const AIPanel = (() => {
     if (els.debugLog) els.debugLog.innerHTML = '';
     debugCount = 0;
     if (els.debugBadge) els.debugBadge.hidden = true;
+  }
+
+  /* ---------- Test Matching (manual debug tool) ---------- */
+  function onTestMatch() {
+    const pdfText = els.testPdfText.value.trim();
+    const aiJson = els.testAiJson.value.trim();
+
+    if (!pdfText) {
+      debugLog('TEST', '⚠️ PDF text is empty. Paste some text first.');
+      return;
+    }
+    if (!aiJson) {
+      debugLog('TEST', '⚠️ AI JSON is empty. Paste an AI response first.');
+      return;
+    }
+
+    debugLog('TEST', 'Starting test match', {
+      pdfTextLength: pdfText.length + ' chars',
+      pdfTextPreview: pdfText.length > 120 ? pdfText.slice(0, 120) + '…' : pdfText,
+    });
+
+    // Parse passages using the same logic as auto-annotate
+    const passages = AutoAnnotate.parsePassages(aiJson);
+    debugLog('TEST', 'Parsed ' + passages.length + ' passage(s) from AI JSON');
+    if (passages.length === 0) {
+      debugLog('TEST', '⚠️ No passages parsed. Check your JSON format. Expected: [{"text": "...", "note": "..."}]');
+      return;
+    }
+
+    // Build a minimal text index from plain text (no PDF.js items needed for matching)
+    const idx = { full: pdfText, charMap: [], items: [] };
+
+    let matched = 0;
+    let unmatched = 0;
+
+    for (let i = 0; i < passages.length; i++) {
+      const p = passages[i];
+      const snippet = (p.text || '').trim();
+      if (!snippet) continue;
+
+      const preview = '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"';
+      debugLog('TEST', '─── Passage ' + (i + 1) + '/' + passages.length + ': ' + preview);
+
+      const range = TextGeometry.findSnippetRange(idx, snippet, (info) => {
+        if (info.type === 'fuzzy-start') {
+          debugLog('FUZZY', 'Strategies 1-3 failed, attempting fuzzy match', {
+            aiOriginal: info.aiOriginal,
+            aiStripped: info.aiStripped,
+            aiWords: info.aiWordCount,
+            pdfWords: info.pdfWordCount,
+          });
+        } else if (info.type === 'fuzzy-match') {
+          debugLog('FUZZY', 'FUZZY MATCH (score=' + info.score.toFixed(2) +
+            ', ' + info.matchedWords + '/' + info.totalAiWords + ' words, ' + info.skips + ' skips)', {
+            score: info.score,
+            matchedWords: info.matchedWords + '/' + info.totalAiWords,
+            skips: info.skips,
+            skippedAiWords: info.skippedAiWords,
+            pdfMatchedRegion: info.pdfMatchedRegion,
+            pdfMatchedStripped: info.pdfMatchedStripped,
+          });
+        } else if (info.type === 'fuzzy-no-match') {
+          debugLog('FUZZY', 'Fuzzy match failed — ' + info.reason, {
+            aiWordCount: info.aiWordCount,
+            maxSkips: info.maxSkips,
+          });
+        } else if (info.type === 'fuzzy-reject') {
+          debugLog('FUZZY', 'Fuzzy match rejected — ' + info.reason);
+        }
+      });
+
+      if (range) {
+        matched++;
+        const matchedText = pdfText.slice(range.start, range.end);
+        debugLog('TEST', '✓ MATCHED (score=' + range.score.toFixed(2) + ', chars ' + range.start + '-' + range.end + ')', {
+          matchedText: matchedText.length > 200 ? matchedText.slice(0, 200) + '…' : matchedText,
+        });
+      } else {
+        unmatched++;
+        debugLog('TEST', '✗ NO MATCH (all strategies failed)');
+      }
+    }
+
+    debugLog('TEST', '═══ Test complete: ' + matched + ' matched, ' + unmatched + ' unmatched, ' + passages.length + ' total ═══');
   }
 
   function formatMs(ms) {
