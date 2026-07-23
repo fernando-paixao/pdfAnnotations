@@ -24,6 +24,7 @@ const Highlighter = (() => {
     updateAnnotation: null,  // async (ann)
     deleteAnnotation: null,  // async (id)
     annotationChanged: null, // ()
+    onAnnotationClicked: null, // (id) — fired when a highlight rect is clicked
   };
 
   function init(viewer, btn, popover) {
@@ -254,6 +255,8 @@ const Highlighter = (() => {
     activeAnnotationId = id;
     editorText.value = ann.annotationText || '';
     editorPopover.hidden = false;
+    // Notify listeners (e.g. scroll annotation list to this item)
+    if (callbacks.onAnnotationClicked) callbacks.onAnnotationClicked(id);
     // Position near click or near the highlight
     let x = clientX, y = clientY;
     if (x == null || y == null) {

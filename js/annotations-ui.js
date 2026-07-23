@@ -104,5 +104,15 @@ const AnnotationsUI = (() => {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  return { init, render, callbacks };
+  function scrollToAnnotation(id) {
+    const item = listEl.querySelector('[data-ann-id="' + id + '"]');
+    if (item) {
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Briefly flash the item to draw attention
+      item.classList.add('flash-item');
+      setTimeout(() => item.classList.remove('flash-item'), 1000);
+    }
+  }
+
+  return { init, render, scrollToAnnotation, callbacks };
 })();

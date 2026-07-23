@@ -315,6 +315,13 @@ button.danger:hover { background: var(--danger); color: #fff; }
   transition: border-color 0.12s, background 0.12s;
 }
 .annotation-item:hover { border-color: var(--accent); }
+.annotation-item.flash-item {
+  animation: flash-item 1s ease-out;
+}
+@keyframes flash-item {
+  0% { background: var(--accent); border-color: var(--accent); }
+  100% { background: var(--bg-elev); border-color: var(--border); }
+}
 .annotation-item .meta {
   display: flex;
   justify-content: space-between;

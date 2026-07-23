@@ -99,6 +99,9 @@
     currentAnnotations = currentAnnotations.filter((a) => a.id !== id);
   };
   Highlighter.callbacks.annotationChanged = () => refreshUI();
+  Highlighter.callbacks.onAnnotationClicked = (id) => {
+    AnnotationsUI.scrollToAnnotation(id);
+  };
 
   AnnotationsUI.init($('annotationList'), $('annotationCount'), searchBox, $('emptyAnnotations'));
   AnnotationsUI.callbacks.onJump = (id) => {
