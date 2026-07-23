@@ -30,6 +30,10 @@ const AIPanel = (() => {
   let abortController = null;
   let viewMode = 'text'; // 'text' | 'markdown'
 
+  // --- Retry configuration ---
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
+
   // Queue state
   let queue = [];             // [{id, messages, label}]
   let isProcessing = false;
@@ -261,6 +265,64 @@ const AIPanel = (() => {
     }
   }
 
+  /* ---------- Retry helpers ---------- */
+
+  /**
+   * Abort-aware delay: resolves after ms, but rejects immediately
+   * with AbortError if the user aborts during the wait.
+   */
+  function abortAwareDelay(ms) {
+    return new Promise((resolve, reject) => {
+      if (abortController && abortController.signal.aborted) {
+        reject({ name: 'AbortError' });
+        return;
+      }
+      var onAbort = function () { clearTimeout(timer); reject({ name: 'AbortError' }); };
+      var timer = setTimeout(function () {
+        if (abortController) abortController.signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      if (abortController) abortController.signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  /**
+   * Call Ollama.chat with automatic retry on failure.
+   * Clears partial streaming response before each retry.
+   * Abort errors propagate immediately (no retry).
+   */
+  async function chatWithRetry(chatOpts, item) {
+    var lastErr;
+    for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      if (abortController && abortController.signal.aborted) throw { name: 'AbortError' };
+      // Clear partial response on retry
+      if (attempt > 1) {
+        els.response.textContent = '';
+        els.responseMd.innerHTML = '';
+        els.thinking.textContent = '';
+        els.thinking.hidden = true;
+        debugLog('INFO', '#' + item.id + ' retry attempt ' + attempt + '/' + MAX_RETRIES);
+        els.status.textContent = '⚠️ Retry ' + attempt + '/' + MAX_RETRIES + ' — ' +
+          I18N.t('ai.status.generating') + ' #' + item.id + '…';
+      }
+      try {
+        return await Ollama.chat(chatOpts);
+      } catch (err) {
+        if (err && err.name === 'AbortError') throw err;
+        lastErr = err;
+        debugLog('ERR', '#' + item.id + ' attempt ' + attempt + '/' + MAX_RETRIES +
+          ' failed — ' + (err.message || err));
+        if (attempt < MAX_RETRIES) {
+          els.status.innerHTML = '⚠️ ' + escapeHtml(err.message || '') +
+            ' — retrying in ' + (RETRY_DELAY_MS / 1000) + 's (' +
+            attempt + '/' + MAX_RETRIES + ')…';
+          await abortAwareDelay(RETRY_DELAY_MS);
+        }
+      }
+    }
+    throw lastErr;
+  }
+
   /* ---------- Send (with queue) ---------- */
   async function onSend() {
     collectSettings();
@@ -326,7 +388,7 @@ const AIPanel = (() => {
     abortController = new AbortController();
     try {
       els.status.textContent = I18N.t('ai.status.generating') + ' #' + item.id + ' (' + item.label + ')…';
-      const result = await Ollama.chat({
+      const result = await chatWithRetry({
         host: settings.host,
         model: settings.model,
         messages: item.messages,
@@ -355,16 +417,18 @@ const AIPanel = (() => {
           debugLog('TIME', '#' + item.id + ' First token: ' + formatMs(s.timeToFirstTokenMs) +
             ' | Total: ' + formatMs(s.totalTimeMs));
         },
-      });
+      }, item);
       if (!settings.streaming) els.response.textContent = result;
       els.responseMd.innerHTML = Markdown.render(els.response.textContent);
       els.status.textContent = '✓ ' + I18N.t('ai.status.done') + ' #' + item.id + ' (' + item.label + ')';
       playCompletionSound();
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (err && err.name === 'AbortError') {
         els.status.textContent = I18N.t('ai.status.stopped') + ' #' + item.id + '.';
       } else {
-        els.status.innerHTML = '⚠️ #' + item.id + ' ' + escapeHtml(err.message) +
+        debugLog('ERR', '#' + item.id + ' all ' + MAX_RETRIES + ' attempts failed — ' + (err.message || err));
+        els.status.innerHTML = '⚠️ #' + item.id + ' failed after ' + MAX_RETRIES + ' retries: ' +
+          escapeHtml(err.message || '') +
           '<br><span class="hint">' + I18N.t('ai.status.corsHint') + ' ' +
           '<code>OLLAMA_ORIGINS=*</code>.</span>';
         playErrorSound();

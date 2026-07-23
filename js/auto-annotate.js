@@ -25,8 +25,68 @@ const AutoAnnotate = (() => {
 
   let abortController = null;
 
+  // --- Retry configuration ---
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
+
   function debug(category, message, data) {
     if (callbacks.onDebug) callbacks.onDebug(category, message, data);
+  }
+
+  /**
+   * Abort-aware delay: resolves after ms, but rejects immediately
+   * with AbortError if the user aborts during the wait.
+   */
+  function abortAwareDelay(ms) {
+    return new Promise((resolve, reject) => {
+      if (abortController && abortController.signal.aborted) {
+        reject({ name: 'AbortError' });
+        return;
+      }
+      var onAbort = () => { clearTimeout(timer); reject({ name: 'AbortError' }); };
+      var timer = setTimeout(() => {
+        if (abortController) abortController.signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      if (abortController) abortController.signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  /**
+   * Call Ollama.chat with automatic retry on failure.
+   * Retries up to MAX_RETRIES times with RETRY_DELAY_MS between attempts.
+   * Abort errors propagate immediately (no retry).
+   * @param {Object} chatOpts  - options for Ollama.chat()
+   * @param {string} pageLabel - human-readable label for debug/progress messages
+   * @returns {Promise<string>} response text
+   */
+  async function chatWithRetry(chatOpts, pageLabel) {
+    var lastErr;
+    for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      if (abortController && abortController.signal.aborted) throw { name: 'AbortError' };
+      try {
+        if (attempt > 1) {
+          debug('AUTO', pageLabel + ': retry attempt ' + attempt + '/' + MAX_RETRIES);
+          if (callbacks.onProgress) {
+            callbacks.onProgress(pageLabel + ': retrying (' + attempt + '/' + MAX_RETRIES + ')…');
+          }
+        }
+        return await Ollama.chat(chatOpts);
+      } catch (err) {
+        if (err && err.name === 'AbortError') throw err;
+        lastErr = err;
+        debug('ERR', pageLabel + ': attempt ' + attempt + '/' + MAX_RETRIES +
+          ' failed — ' + (err.message || err));
+        if (attempt < MAX_RETRIES) {
+          if (callbacks.onProgress) {
+            callbacks.onProgress(pageLabel + ': error, retrying in ' +
+              (RETRY_DELAY_MS / 1000) + 's… (' + (err.message || err) + ')');
+          }
+          await abortAwareDelay(RETRY_DELAY_MS);
+        }
+      }
+    }
+    throw lastErr;
   }
 
   function init() {}
@@ -77,7 +137,7 @@ const AutoAnnotate = (() => {
       messages.push({ role: 'user', content: prompt });
       let raw;
       try {
-        raw = await Ollama.chat({
+        raw = await chatWithRetry({
           host: settings.host,
           model: settings.model,
           messages,
@@ -93,11 +153,11 @@ const AutoAnnotate = (() => {
             debug('TIME', 'Page ' + pg.page + ': first token=' + s.timeToFirstTokenMs +
               'ms | total=' + s.totalTimeMs + 'ms');
           },
-        });
+        }, 'Page ' + pg.page);
       } catch (err) {
-        if (err.name === 'AbortError') { debug('AUTO', 'Aborted by user'); break; }
-        debug('ERR', 'Page ' + pg.page + ': ' + err.message);
-        if (callbacks.onError) callbacks.onError('Ollama error on page ' + pg.page + ': ' + err.message);
+        if (err && err.name === 'AbortError') { debug('AUTO', 'Aborted by user'); break; }
+        debug('ERR', 'Page ' + pg.page + ': all ' + MAX_RETRIES + ' attempts failed — ' + (err.message || err));
+        if (callbacks.onError) callbacks.onError('Page ' + pg.page + ': failed after ' + MAX_RETRIES + ' retries — ' + (err.message || err));
         continue;
       }
 
