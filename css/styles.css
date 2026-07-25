@@ -361,6 +361,27 @@ button.danger:hover { background: var(--danger); color: #fff; }
   line-height: 1.5;
 }
 
+/* Annotation action buttons (copy + delete) */
+.annotation-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.copy-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.copy-btn:hover { background: var(--accent); border-color: var(--accent); }
+.copy-btn.copied { background: var(--ok); border-color: var(--ok); }
+.annotation-actions .danger { padding: 4px 10px; font-size: 12px; }
+
 /* ===== Floating highlight button ===== */
 .highlight-btn {
   position: fixed;

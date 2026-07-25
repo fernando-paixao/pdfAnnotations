@@ -34,6 +34,7 @@ const I18N = (() => {
       'panel.empty': 'No annotations yet. Select text in the PDF and click',
       'panel.emptyHighlight': 'Highlight',
       'panel.noMatches': 'No matches.',
+      'panel.copyText': 'Copy text',
 
       // Namespace
       'ns.selectTitle': 'Select namespace',
@@ -206,6 +207,7 @@ const I18N = (() => {
       'panel.empty': 'Nenhuma anotação ainda. Selecione texto no PDF e clique em',
       'panel.emptyHighlight': 'Destacar',
       'panel.noMatches': 'Nenhuma correspondência.',
+      'panel.copyText': 'Copiar texto',
 
       // Namespace
       'ns.selectTitle': 'Selecionar namespace',

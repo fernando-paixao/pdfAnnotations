@@ -56,6 +56,9 @@ const AnnotationsUI = (() => {
       li.className = 'annotation-item';
       li.dataset.annId = ann.id;
 
+      // Tooltip with the full selected text on hover
+      li.title = ann.textSelected || '';
+
       const meta = document.createElement('div');
       meta.className = 'meta';
       const pageTag = document.createElement('span');
@@ -80,15 +83,50 @@ const AnnotationsUI = (() => {
         li.appendChild(note);
       }
 
+      // Action buttons row
+      const actions = document.createElement('div');
+      actions.className = 'annotation-actions';
+
+      const copy = document.createElement('button');
+      copy.className = 'copy-btn';
+      copy.title = I18N.t('panel.copyText');
+      copy.textContent = '📋';
+      copy.addEventListener('click', (e) => {
+        e.stopPropagation();
+        var text = ann.textSelected || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            copy.textContent = '✓';
+            copy.classList.add('copied');
+            setTimeout(() => { copy.textContent = '📋'; copy.classList.remove('copied'); }, 1500);
+          }).catch(() => {});
+        } else {
+          // Fallback for older browsers
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e2) {}
+          ta.remove();
+          copy.textContent = '✓';
+          copy.classList.add('copied');
+          setTimeout(() => { copy.textContent = '📋'; copy.classList.remove('copied'); }, 1500);
+        }
+      });
+      actions.appendChild(copy);
+
       const del = document.createElement('button');
       del.className = 'danger';
       del.textContent = I18N.t('editor.delete');
-      del.style.marginTop = '8px';
       del.addEventListener('click', (e) => {
         e.stopPropagation();
         if (callbacks.onDelete) callbacks.onDelete(ann.id);
       });
-      li.appendChild(del);
+      actions.appendChild(del);
+
+      li.appendChild(actions);
 
       li.addEventListener('click', () => {
         if (callbacks.onJump) callbacks.onJump(ann.id);
