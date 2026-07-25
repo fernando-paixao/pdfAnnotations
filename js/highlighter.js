@@ -212,6 +212,13 @@ const Highlighter = (() => {
   }
 
   function redrawPage(pageNumber) {
+    const wrapper = PDFViewer.getPageWrapper(pageNumber);
+    if (!wrapper) return;
+    const layer = wrapper.querySelector('.highlight-layer');
+    if (!layer) return;
+    // Clear ALL existing rects first (removes annotations from previous namespace)
+    layer.innerHTML = '';
+    // Draw current annotations for this page
     const m = byPage.get(pageNumber);
     if (!m) return;
     m.forEach((ann) => drawAnnotation(ann));
