@@ -16,6 +16,7 @@ const PDFViewer = (() => {
   let observer = null;
   let dpr = window.devicePixelRatio || 1;
   let textContentCache = []; // 1-indexed: cached getTextContent results
+  let spanMaps = [];         // 1-indexed: Map<itemIdx, HTMLSpanElement> for DOM-based geometry
 
   // External callbacks
   const callbacks = {
@@ -52,6 +53,7 @@ const PDFViewer = (() => {
     pageViewports = new Array(numPages + 1);
     renderedGen = new Array(numPages + 1).fill(0);
     textContentCache = new Array(numPages + 1);
+    spanMaps = new Array(numPages + 1);
 
     // Fetch base viewports (cheap; no rendering) for correct placeholder sizes
     for (let i = 1; i <= numPages; i++) {
@@ -156,6 +158,21 @@ const PDFViewer = (() => {
       });
       await textLayer.promise;
 
+      // Build span map: Map<itemIdx, HTMLSpanElement> for DOM-based geometry.
+      // PDF.js creates spans in the same order as non-empty textContent.items.
+      const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+      const spanMap = new Map();
+      let spanPtr = 0;
+      for (let i = 0; i < textContent.items.length; i++) {
+        const item = textContent.items[i];
+        if (!item || !item.str || !item.str.length) continue;
+        if (spanPtr < spans.length) {
+          spanMap.set(i, spans[spanPtr]);
+          spanPtr++;
+        }
+      }
+      spanMaps[pageNumber] = spanMap;
+
       // Notify highlighter to (re)draw saved highlights for this page
       if (callbacks.onPageRendered) {
         callbacks.onPageRendered(pageNumber, wrapper, viewport, scale);
@@ -199,6 +216,7 @@ const PDFViewer = (() => {
       wrapper.querySelector('.textLayer').innerHTML = '';
       wrapper.querySelector('.highlight-layer').innerHTML = '';
     }
+    spanMaps = new Array(numPages + 1);
     if (callbacks.onScaleChange) callbacks.onScaleChange(scale);
     // Re-render visible pages right away
     requestAnimationFrame(() => {
@@ -236,12 +254,15 @@ const PDFViewer = (() => {
   // Base viewport (scale 1) for coordinate conversion
   function getBaseViewport(pageNumber) { return pageViewports[pageNumber] || null; }
 
+  // Span map for DOM-based geometry (pixel-perfect rects)
+  function getSpanMap(pageNumber) { return spanMaps[pageNumber] || null; }
+
   return {
     init,
     loadArrayBuffer,
     setScale, zoomIn, zoomOut, getScale,
     goToPage, getNumPages, getPageWrapper,
-    getTextContent, getBaseViewport,
+    getTextContent, getBaseViewport, getSpanMap,
     renderPage,
     callbacks,
   };

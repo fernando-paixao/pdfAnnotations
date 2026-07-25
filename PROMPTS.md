@@ -179,3 +179,114 @@ MIN_MATCHED_WORDS = 3 — minimum absolute word count
 MAX_SKIP_RATIO = 0.3 — 30% skip budget for prefix/suffix noise
 The design plan is documented at plans/fuzzy-matching-fallback-plan.md.
 ---
+## How Annotation Positioning Works
+
+Your app has **two completely different code paths** for computing annotation rectangles, and they produce different levels of accuracy. This is the root of your pixel-perfect mismatch.
+
+---
+
+### Path 1 — Manual Highlights (pixel-perfect)
+
+When a user selects text, [`onHighlightClick()`](js/highlighter.js:126) runs. It reads the **browser's own rendered geometry** from the PDF.js text layer:
+
+```js
+for (const r of range.getClientRects()) {
+  const localX = r.left - wrapperRect.left;
+  const localY = r.top - wrapperRect.top;
+  const nx = localX / wrapperRect.width;   // fraction of page
+  const ny = localY / wrapperRect.height;
+  ...
+  rects.push({ x: nx, y: ny, width: nw, height: nh });  // normalized 0..1
+}
+```
+
+This is **pixel-perfect** because `getClientRects()` returns the actual on-screen positions of the transparent text-layer spans that PDF.js positioned using real glyph metrics. The result is stored as fractions of the page (0..1).
+
+---
+
+### Path 2 — AI Auto-Annotations (calculated, NOT pixel-perfect)
+
+When the AI returns a text passage, the position is **calculated from PDF metadata**, never from the rendered text layer. The pipeline is:
+
+1. **Build a text index** — [`buildIndex()`](js/text-geometry.js:21) concatenates all `textContent.items` into one big string, keeping a `charMap` that maps each character back to its source PDF text item.
+
+2. **Find the matching range** — [`findSnippetRange()`](js/text-geometry.js:204) uses a 4-strategy cascade (exact substring → anchor words → sliding window → fuzzy Levenshtein word matching) to locate the AI's snippet inside the indexed page text. This returns a `{start, end}` character range.
+
+3. **Convert range → rectangles** — [`rangeToRects()`](js/text-geometry.js:59) is where the **position is actually computed**. This is the problematic function.
+
+---
+
+### The Rendering (shared by both paths)
+
+[`drawAnnotation()`](js/highlighter.js:185) takes the normalized `{x, y, width, height}` fractions and renders them as percentage-positioned divs inside the `.highlight-layer` (which is `position: absolute; inset: 0` over the page). Since both paths store fractions and render identically, the rendering layer itself is not the problem.
+
+---
+
+## Where the Pixel-Perfect Mismatch Comes From
+
+The mismatch lives entirely inside [`rangeToRects()`](js/text-geometry.js:59). Here are the specific sources of error:
+
+### 1. Monospace character-width assumption (biggest horizontal error)
+
+```js
+const charW = item.width ? item.width / len : 0;   // line 77
+const x0 = baseX + lo * charW;                      // line 81
+const x1 = baseX + (hi + 1) * charW;                // line 82
+```
+
+`item.width` is the total width of the **entire text run** (sum of real glyph advances). Dividing by `len` gives the **average** character width. It then assumes every character is that wide — a monospace model. For proportional fonts (most PDFs), narrow letters like `i`, `l`, `t` are over-estimated and wide letters like `m`, `w` are under-estimated. The highlight's left/right edges drift proportionally to how far into the run the match sits.
+
+### 2. Vertical baseline heuristic (top/bottom error)
+
+```js
+const h = item.height || Math.hypot(t[0], t[1]) || 10;          // line 80
+const vr = vp.convertToViewportRectangle([
+  x0, baseY - h * 0.2,    // top    — line 83
+  x1, baseY + h * 0.85    // bottom — line 83
+]);
+```
+
+`baseY` (`item.transform[5]`) is the **text baseline** in PDF coordinates, not the top of the glyph. The code guesses the visual box by subtracting `h * 0.2` for the top and adding `h * 0.85` for the bottom. These magic constants (0.2 / 0.85) are approximations — real glyph ascenders/descenders vary by font, so the highlight box is often too tall, too short, or vertically shifted relative to the visible text.
+
+### 3. `item.height` may not equal visual glyph height
+
+`item.height` comes from PDF.js and represents the font size metric, but it doesn't always correspond to the actual ink height of the rendered glyphs (especially with fonts that have unusual metrics or embedded subsets).
+
+---
+
+## Visual Summary
+
+```mermaid
+flowchart TD
+    subgraph Manual["Manual Highlight (pixel-perfect)"]
+        M1["User selects text in<br/>PDF.js text layer"] --> M2["range.getClientRects<br/>= real rendered geometry"]
+        M2 --> M3["Normalize to 0..1<br/>fractions of page"]
+    end
+
+    subgraph AI["AI Auto-Annotate (calculated)"]
+        A1["AI returns text passage"] --> A2["findSnippetRange<br/>4-strategy fuzzy match<br/>→ char range start,end"]
+        A2 --> A3["rangeToRects<br/>CALCULATED geometry"]
+        A3 --> A4["⚠️ Monospace char-width<br/>assumption (horizontal error)"]
+        A3 --> A5["⚠️ Baseline heuristic<br/>0.2 / 0.85 (vertical error)"]
+        A4 --> A6["Normalize to 0..1<br/>fractions of page"]
+        A5 --> A6
+    end
+
+    M3 --> R["drawAnnotation<br/>% positioned divs in .highlight-layer"]
+    A6 --> R
+    R --> V["Visible highlight overlay"]
+```
+
+---
+
+## Key Takeaway
+
+**Manual highlights are pixel-perfect** because they read the browser's actual rendered text geometry. **AI annotations are not**, because [`rangeToRects()`](js/text-geometry.js:59) reconstructs positions mathematically from PDF text-item metadata using two lossy approximations:
+
+| Source | What's wrong | Affects |
+|---|---|---|
+| `charW = item.width / len` | Assumes uniform character width | Horizontal position & width |
+| `baseY ± h * {0.2, 0.85}` | Guesses glyph box from baseline | Vertical position & height |
+
+If you want AI annotations to be as accurate as manual ones, the fix would be to use PDF.js's per-character glyph widths (available in newer `getTextContent` with `includeMarkedContent` / `disableNormalization`, or via the text-layer span geometry) instead of the average-width model — essentially making the AI path use the same real geometry that the manual path gets for free from `getClientRects()`.
+---

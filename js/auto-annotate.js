@@ -177,6 +177,7 @@ const AutoAnnotate = (() => {
       const baseVp = PDFViewer.getBaseViewport(pg.page);
       if (!baseVp) continue;
       const vp = baseVp.clone({ scale: PDFViewer.getScale() });
+      const spanMap = PDFViewer.getSpanMap(pg.page);
 
       for (const p of passages) {
         if (abortController.signal.aborted) break;
@@ -218,7 +219,7 @@ const AutoAnnotate = (() => {
         }
         debug('AUTO', 'Page ' + pg.page + ': matched (score=' + range.score.toFixed(2) + ')',
           '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
-        const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp);
+        const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp, spanMap);
         if (!rects.length) { skipped++; debug('AUTO', 'Page ' + pg.page + ': matched but no rects'); continue; }
         const data = {
           namespaceId: HighlighterCurrentNamespaceId(),

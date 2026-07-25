@@ -52,7 +52,8 @@ const Search = (() => {
   function matchRects(page, start, end, vp) {
     const idx = pageIndices.get(page);
     if (!idx) return [];
-    return TextGeometry.rangeToRects(idx, start, end, vp);
+    const spanMap = PDFViewer.getSpanMap(page);
+    return TextGeometry.rangeToRects(idx, start, end, vp, spanMap);
   }
 
   /* ---------- Drawing ---------- */

@@ -50,13 +50,20 @@ const TextGeometry = (() => {
   /**
    * Convert a [start, end) char range (in the index's `full` string) on a page
    * into normalized rects (fractions of page size).
+   *
+   * When a spanMap is provided (Map<itemIdx, HTMLSpanElement> from the rendered
+   * PDF.js text layer), uses the DOM Range API for pixel-perfect positioning —
+   * the same mechanism that makes manual text-selection highlights accurate.
+   * Falls back to calculated geometry from PDF metadata when no span is available.
+   *
    * @param {Object} idx   - result of buildIndex()
    * @param {number} start - start char offset
    * @param {number} end   - end char offset (exclusive)
    * @param {Object} vp    - PDF.js viewport at the current scale
+   * @param {Map|null} [spanMap] - optional Map<itemIdx, HTMLSpanElement>
    * @returns {Array<{x,y,width,height}>} normalized rects
    */
-  function rangeToRects(idx, start, end, vp) {
+  function rangeToRects(idx, start, end, vp, spanMap) {
     const groups = {}; // itemIdx -> [minLocal, maxLocal]
     for (let i = start; i < end && i < idx.charMap.length; i++) {
       const cm = idx.charMap[i];
@@ -69,11 +76,46 @@ const TextGeometry = (() => {
     }
     const rects = [];
     Object.keys(groups).forEach((k) => {
-      const item = idx.items[Number(k)];
+      const itemIdx = Number(k);
+      const item = idx.items[itemIdx];
       if (!item) return;
       const [lo, hi] = groups[k];
-      const t = item.transform || [1, 0, 0, 1, 0, 0];
       const len = item.str ? item.str.length : 1;
+
+      // --- DOM-based geometry (pixel-perfect) ---
+      // When the text-layer span is available, use the browser's Range API
+      // to get real rendered glyph positions — identical to how manual
+      // text-selection highlights achieve pixel-perfect accuracy.
+      const span = spanMap ? spanMap.get(itemIdx) : null;
+      if (span && span.firstChild && span.firstChild.nodeType === 3) {
+        const wrapper = span.closest('.page-wrapper');
+        if (wrapper) {
+          const wrapperRect = wrapper.getBoundingClientRect();
+          if (wrapperRect.width > 0 && wrapperRect.height > 0) {
+            const textNode = span.firstChild;
+            const range = document.createRange();
+            range.setStart(textNode, Math.min(lo, textNode.length));
+            range.setEnd(textNode, Math.min(hi + 1, textNode.length));
+            const subRects = range.getClientRects();
+            let added = false;
+            for (const sr of subRects) {
+              if (sr.width < 1 || sr.height < 1) continue;
+              rects.push({
+                x: (sr.left - wrapperRect.left) / wrapperRect.width,
+                y: (sr.top - wrapperRect.top) / wrapperRect.height,
+                width: sr.width / wrapperRect.width,
+                height: sr.height / wrapperRect.height,
+              });
+              added = true;
+            }
+            if (added) return; // success — skip calculated fallback
+          }
+        }
+      }
+
+      // --- Calculated fallback (from PDF metadata) ---
+      // Used when the page hasn't been rendered yet (no text-layer spans).
+      const t = item.transform || [1, 0, 0, 1, 0, 0];
       const charW = item.width ? item.width / len : 0;
       const baseX = t[4];
       const baseY = t[5];
