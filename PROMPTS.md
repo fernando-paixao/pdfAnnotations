@@ -290,3 +290,18 @@ flowchart TD
 
 If you want AI annotations to be as accurate as manual ones, the fix would be to use PDF.js's per-character glyph widths (available in newer `getTextContent` with `includeMarkedContent` / `disableNormalization`, or via the text-layer span geometry) instead of the average-width model — essentially making the AI path use the same real geometry that the manual path gets for free from `getClientRects()`.
 ---
+Now can you add a new AI Feature that will read the page range selected and return a text in topics like a Mindmap using 4 spaces identation and let the user input optionally how many levels of topics he wants to limit.
+To each request send the actual "Mindmap of topic in plain text" to the AI can complete it on the response. (Show on debug one message with the actual Mindmap)
+
+Example of output:
+Central topic
+    Topic 1
+    Topic 2
+        Topic 2.1
+---
+Can you add an option to send all pages in one prompt or give each page at once on iterating page per page and retriving and improving the actual mindmap built to be improved on the next page iteraction
+---
+Como viver na prática os ensinamentos do texto abaixo:
+
+$text
+---

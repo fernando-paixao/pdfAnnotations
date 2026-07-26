@@ -193,10 +193,14 @@
             <button id="aiViewText" class="view-btn active" data-i18n-title="ai.viewText" title="Plain text view" data-i18n="ai.viewText">Text</button>
             <button id="aiViewMarkdown" class="view-btn" data-i18n-title="ai.viewMarkdown" title="Rendered Markdown view" data-i18n="ai.viewMarkdown">Markdown</button>
           </div>
+          <button id="aiCopyTop" class="copy-response-btn" data-i18n-title="ai.copy" title="Copy response">📋 <span data-i18n="ai.copy">Copy</span></button>
         </div>
         <div id="aiThinking" class="ai-thinking" hidden></div>
         <div id="aiResponse" class="ai-response"></div>
         <div id="aiResponseMd" class="ai-response markdown-body" hidden></div>
+        <div class="ai-response-actions">
+          <button id="aiCopyBottom" class="copy-response-btn" data-i18n-title="ai.copy" title="Copy response">📋 <span data-i18n="ai.copy">Copy</span></button>
+        </div>
       </details>
 
       <!-- Auto-annotate -->
@@ -223,6 +227,43 @@
             <button id="aiAutoStop" class="danger" hidden data-i18n="ai.stop">Stop</button>
           </div>
           <div id="aiAutoStatus" class="ai-status"></div>
+        </div>
+      </details>
+
+      <!-- Mindmap -->
+      <details class="ai-section">
+        <summary data-i18n="ai.mindmap">Mindmap</summary>
+        <div class="ai-form">
+          <p class="hint" data-i18n="ai.mindmapHint">AI builds a topic mindmap from the selected page range using 4-space indentation. Running again continues/completes the current mindmap.</p>
+          <label><span data-i18n="ai.mindmapMaxLevels">Max topic levels (optional)</span>
+            <input type="number" id="aiMindmapLevels" data-i18n-placeholder="ai.mindmapLevelsPlaceholder" placeholder="leave empty = no limit" min="1" max="20" />
+          </label>
+          <label><span data-i18n="ai.mindmapMode">Processing mode</span>
+            <select id="aiMindmapMode">
+              <option value="all" selected data-i18n="ai.mindmapMode.all">All pages at once</option>
+              <option value="perPage" data-i18n="ai.mindmapMode.perPage">Page by page (iterate &amp; improve)</option>
+            </select>
+          </label>
+          <p class="hint" data-i18n="ai.mindmapModeHint">"Page by page" feeds one page at a time, carrying the mindmap forward so each page improves on the previous one.</p>
+          <details class="ai-subsection">
+            <summary data-i18n="ai.mindmapTemplate">Prompt Template</summary>
+            <textarea id="aiMindmapTemplate" rows="10"
+              data-i18n-placeholder="ai.mindmapTemplatePlaceholder"
+              placeholder="Template is empty — the built-in default will be used."></textarea>
+            <div class="ai-subsection-actions">
+              <button id="aiMindmapResetTpl" class="small" data-i18n="ai.mindmapResetTpl">Reset to default</button>
+            </div>
+            <p class="hint"><span data-i18n="ai.mindmapTemplateHint">Placeholders:</span> <code>$maxLevels</code> <span data-i18n="ai.mindmapTemplateHintLevels">(depth-limit instruction)</span>, <code>$currentMindmap</code> <span data-i18n="ai.mindmapTemplateHintMap">(current mindmap to continue)</span>, <code>$pdfContext</code> <span data-i18n="ai.mindmapTemplateHintCtx">(your context)</span>, <code>$text</code> <span data-i18n="ai.mindmapTemplateHintText">(page text).</span></p>
+          </details>
+          <div class="row">
+            <button id="aiMindmapRun" class="primary" data-i18n="ai.mindmapRun">Generate</button>
+            <button id="aiMindmapStop" class="danger" hidden data-i18n="ai.stop">Stop</button>
+            <button id="aiMindmapClear" class="small" data-i18n="ai.mindmapClear">Clear</button>
+          </div>
+          <div id="aiMindmapStatus" class="ai-status"></div>
+          <textarea id="aiMindmapOutput" class="ai-mindmap-output" rows="12"
+            data-i18n-placeholder="ai.mindmapOutputPlaceholder"
+            placeholder="The mindmap will appear here. You can edit it, then click Generate again so the AI continues it."></textarea>
         </div>
       </details>
 

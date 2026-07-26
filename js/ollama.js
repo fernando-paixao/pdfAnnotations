@@ -93,6 +93,7 @@ const Ollama = (() => {
       requestLength: JSON.stringify(body.messages).length,
       requestBody: JSON.stringify(body, null, 2),
       responseLength: responseText.length,
+      responseText: responseText,
       timeToFirstTokenMs: Math.round(firstTokenMs),
       totalTimeMs: Math.round(endTime - startTime),
     });

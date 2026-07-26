@@ -23,6 +23,9 @@ const AIPanel = (() => {
     includeNotes: true,
     howManyAnnotations: '',
     autoAnnotateTemplate: '',
+    mindmapMaxLevels: '',
+    mindmapMode: 'all',
+    mindmapTemplate: '',
   };
 
   let settings = { ...DEFAULT_SETTINGS };
@@ -95,6 +98,8 @@ const AIPanel = (() => {
     els.responseMd = $('aiResponseMd');
     els.viewText = $('aiViewText');
     els.viewMarkdown = $('aiViewMarkdown');
+    els.copyTop = $('aiCopyTop');
+    els.copyBottom = $('aiCopyBottom');
     els.thinking = $('aiThinking');
     els.status = $('aiStatus');
     els.autoHowMany = $('aiAutoHowMany');
@@ -104,6 +109,15 @@ const AIPanel = (() => {
     els.autoRun = $('aiAutoRun');
     els.autoStop = $('aiAutoStop');
     els.autoStatus = $('aiAutoStatus');
+    els.mindmapLevels = $('aiMindmapLevels');
+    els.mindmapMode = $('aiMindmapMode');
+    els.mindmapRun = $('aiMindmapRun');
+    els.mindmapStop = $('aiMindmapStop');
+    els.mindmapClear = $('aiMindmapClear');
+    els.mindmapStatus = $('aiMindmapStatus');
+    els.mindmapOutput = $('aiMindmapOutput');
+    els.mindmapTemplate = $('aiMindmapTemplate');
+    els.mindmapResetTpl = $('aiMindmapResetTpl');
     els.debugLog = $('aiDebugLog');
     els.debugClear = $('aiDebugClear');
     els.debugBadge = $('aiDebugBadge');
@@ -129,6 +143,9 @@ const AIPanel = (() => {
     els.autoHowMany.value = settings.howManyAnnotations;
     els.autoNotes.checked = settings.includeNotes;
     els.autoTemplate.value = settings.autoAnnotateTemplate || I18N.t('ai.defaultAutoPrompt');
+    els.mindmapLevels.value = settings.mindmapMaxLevels;
+    els.mindmapMode.value = settings.mindmapMode || 'all';
+    els.mindmapTemplate.value = settings.mindmapTemplate || I18N.t('ai.defaultMindmapPrompt');
     updatePageCountVisibility();
   }
 
@@ -148,6 +165,9 @@ const AIPanel = (() => {
     settings.howManyAnnotations = els.autoHowMany.value.trim();
     settings.includeNotes = els.autoNotes.checked;
     settings.autoAnnotateTemplate = els.autoTemplate.value;
+    settings.mindmapMaxLevels = els.mindmapLevels.value.trim();
+    settings.mindmapMode = els.mindmapMode.value;
+    settings.mindmapTemplate = els.mindmapTemplate.value;
     saveSettings();
   }
 
@@ -164,7 +184,7 @@ const AIPanel = (() => {
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
      els.systemPrompt, els.pdfContext, els.contextScope, els.pageCount, els.autoHowMany,
-     els.autoTemplate].forEach((el) => {
+     els.autoTemplate, els.mindmapLevels, els.mindmapMode, els.mindmapTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
     [els.reasoning, els.streaming, els.soundEnabled, els.autoNotes].forEach((el) => {
@@ -182,8 +202,17 @@ const AIPanel = (() => {
     els.clearQueue.addEventListener('click', clearQueue);
     els.viewText.addEventListener('click', () => setViewMode('text'));
     els.viewMarkdown.addEventListener('click', () => setViewMode('markdown'));
+    els.copyTop.addEventListener('click', () => copyResponse(els.copyTop));
+    els.copyBottom.addEventListener('click', () => copyResponse(els.copyBottom));
     els.autoRun.addEventListener('click', onAutoRun);
     els.autoStop.addEventListener('click', onAutoStop);
+    els.mindmapRun.addEventListener('click', onMindmapRun);
+    els.mindmapStop.addEventListener('click', onMindmapStop);
+    els.mindmapClear.addEventListener('click', onMindmapClear);
+    els.mindmapResetTpl.addEventListener('click', () => {
+      els.mindmapTemplate.value = I18N.t('ai.defaultMindmapPrompt');
+      collectSettings();
+    });
     els.autoResetTpl.addEventListener('click', () => {
       els.autoTemplate.value = I18N.t('ai.defaultAutoPrompt');
       collectSettings();
@@ -265,24 +294,54 @@ const AIPanel = (() => {
     }
   }
 
+  /* ---------- Copy response to clipboard ---------- */
+  function copyResponse(btn) {
+    var text = els.response.textContent || '';
+    if (!text.trim()) return;
+    function showCopied() {
+      var label = btn.querySelector('span');
+      var original = label ? label.textContent : '';
+      btn.classList.add('copied');
+      if (label) label.textContent = '✓';
+      setTimeout(function () {
+        btn.classList.remove('copied');
+        if (label) label.textContent = original;
+      }, 1500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(function () {});
+    } else {
+      // Fallback for older browsers / non-secure contexts
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); showCopied(); } catch (e) {}
+      ta.remove();
+    }
+  }
+
   /* ---------- Retry helpers ---------- */
 
   /**
    * Abort-aware delay: resolves after ms, but rejects immediately
    * with AbortError if the user aborts during the wait.
    */
-  function abortAwareDelay(ms) {
+  function abortAwareDelay(ms, ctrl) {
+    ctrl = ctrl || abortController;
     return new Promise((resolve, reject) => {
-      if (abortController && abortController.signal.aborted) {
+      if (ctrl && ctrl.signal.aborted) {
         reject({ name: 'AbortError' });
         return;
       }
       var onAbort = function () { clearTimeout(timer); reject({ name: 'AbortError' }); };
       var timer = setTimeout(function () {
-        if (abortController) abortController.signal.removeEventListener('abort', onAbort);
+        if (ctrl) ctrl.signal.removeEventListener('abort', onAbort);
         resolve();
       }, ms);
-      if (abortController) abortController.signal.addEventListener('abort', onAbort, { once: true });
+      if (ctrl) ctrl.signal.addEventListener('abort', onAbort, { once: true });
     });
   }
 
@@ -293,30 +352,39 @@ const AIPanel = (() => {
    */
   async function chatWithRetry(chatOpts, item) {
     var lastErr;
+    var ctrl = (item && item.abortController) || abortController;
+    var clearFn = (item && typeof item.onClear === 'function')
+      ? item.onClear
+      : function () {
+          els.response.textContent = '';
+          els.responseMd.innerHTML = '';
+          els.thinking.textContent = '';
+          els.thinking.hidden = true;
+        };
+    var statusEl = (item && item.statusEl) || els.status;
+    var id = (item && item.id != null) ? item.id : '?';
+    var label = (item && item.label) ? (' (' + item.label + ')') : '';
     for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      if (abortController && abortController.signal.aborted) throw { name: 'AbortError' };
+      if (ctrl && ctrl.signal.aborted) throw { name: 'AbortError' };
       // Clear partial response on retry
       if (attempt > 1) {
-        els.response.textContent = '';
-        els.responseMd.innerHTML = '';
-        els.thinking.textContent = '';
-        els.thinking.hidden = true;
-        debugLog('INFO', '#' + item.id + ' retry attempt ' + attempt + '/' + MAX_RETRIES);
-        els.status.textContent = '⚠️ Retry ' + attempt + '/' + MAX_RETRIES + ' — ' +
-          I18N.t('ai.status.generating') + ' #' + item.id + '…';
+        clearFn();
+        debugLog('INFO', '#' + id + label + ' retry attempt ' + attempt + '/' + MAX_RETRIES);
+        statusEl.textContent = '⚠️ Retry ' + attempt + '/' + MAX_RETRIES + ' — ' +
+          I18N.t('ai.status.generating') + ' #' + id + '…';
       }
       try {
         return await Ollama.chat(chatOpts);
       } catch (err) {
         if (err && err.name === 'AbortError') throw err;
         lastErr = err;
-        debugLog('ERR', '#' + item.id + ' attempt ' + attempt + '/' + MAX_RETRIES +
+        debugLog('ERR', '#' + id + label + ' attempt ' + attempt + '/' + MAX_RETRIES +
           ' failed — ' + (err.message || err));
         if (attempt < MAX_RETRIES) {
-          els.status.innerHTML = '⚠️ ' + escapeHtml(err.message || '') +
+          statusEl.innerHTML = '⚠️ ' + escapeHtml(err.message || '') +
             ' — retrying in ' + (RETRY_DELAY_MS / 1000) + 's (' +
             attempt + '/' + MAX_RETRIES + ')…';
-          await abortAwareDelay(RETRY_DELAY_MS);
+          await abortAwareDelay(RETRY_DELAY_MS, ctrl);
         }
       }
     }
@@ -413,7 +481,7 @@ const AIPanel = (() => {
             ' | maxTokens=' + s.maxTokens + ' | numCtx=' + s.numCtx +
             ' | messages=' + s.messageCount + ' | promptLen=' + s.requestLength);
           debugLog('BODY', s.requestBody);
-          debugLog('RESP', '#' + item.id + ' Response length: ' + s.responseLength + ' chars');
+          debugLog('RESP', '#' + item.id + ' Response length: ' + s.responseLength + ' chars', s.responseText);
           debugLog('TIME', '#' + item.id + ' First token: ' + formatMs(s.timeToFirstTokenMs) +
             ' | Total: ' + formatMs(s.totalTimeMs));
         },
@@ -550,6 +618,176 @@ const AIPanel = (() => {
       osc.start(now);
       osc.stop(now + 0.3);
     } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- Mindmap ---------- */
+  let mindmapAbort = null;
+
+  /**
+   * Build the mindmap prompt from the template.
+   * Placeholders:
+   *   $maxLevels       — instruction for depth limit (empty when not set)
+   *   $currentMindmap  — the current mindmap text to continue/complete (empty on first run)
+   *   $pdfContext      — optional background context
+   *   $text            — the page text
+   */
+  function buildMindmapPrompt(text, maxLevels, currentMindmap, pdfContext, template) {
+    const levelsLine = maxLevels && maxLevels > 0
+      ? 'Limit the mindmap to at most ' + maxLevels + ' level(s) of depth (the central topic is level 1).'
+      : '';
+    const mapLine = currentMindmap && currentMindmap.trim()
+      ? 'Here is the current mindmap. Continue and COMPLETE it by adding more topics and subtopics. ' +
+        'Return the FULL mindmap (include the existing topics plus the new ones), still following the 4-space indentation rule:\n\n' +
+        currentMindmap.trim()
+      : '';
+    const ctx = pdfContext && pdfContext.trim() ? pdfContext.trim() : '';
+    const tmpl = (template && template.trim()) ? template.trim() : I18N.t('ai.defaultMindmapPrompt');
+    return tmpl
+      .replace(/\$maxLevels/g, levelsLine)
+      .replace(/\$currentMindmap/g, mapLine)
+      .replace(/\$pdfContext/g, ctx)
+      .replace(/\$text/g, text);
+  }
+
+  /**
+   * Split the gathered context into one or more iterations.
+   * - 'all' mode: a single iteration with the combined page text.
+   * - 'perPage' mode: one iteration per page, carrying the mindmap forward so
+   *   each page improves on the previous one.
+   * Falls back to a single iteration for selected-text or single-page ranges.
+   * Returns [{text, label}].
+   */
+  function buildMindmapIterations(ctx, mode) {
+    if (mode === 'perPage' && ctx.pages.length > 1) {
+      return ctx.pages.map((pg, i) => ({
+        text: pg.text,
+        label: 'Page ' + pg.page + ' (' + (i + 1) + '/' + ctx.pages.length + ')',
+      }));
+    }
+    let label;
+    if (ctx.pages.length > 0) {
+      label = ctx.pages.length === 1
+        ? 'Page ' + ctx.pages[0].page
+        : 'Pages ' + ctx.pages.map((p) => p.page).join(',');
+    } else {
+      label = 'Selected text';
+    }
+    return [{ text: ctx.text, label: label }];
+  }
+
+  async function onMindmapRun() {
+    collectSettings();
+    if (!settings.model) {
+      els.mindmapStatus.textContent = I18N.t('ai.status.setModel');
+      return;
+    }
+    if (mindmapAbort) return; // already running
+
+    els.mindmapRun.disabled = true;
+    els.mindmapStop.hidden = false;
+
+    const maxLevels = settings.mindmapMaxLevels ? parseInt(settings.mindmapMaxLevels, 10) : null;
+    const mode = settings.mindmapMode === 'perPage' ? 'perPage' : 'all';
+
+    try {
+      els.mindmapStatus.textContent = I18N.t('ai.mindmapStatus.generating');
+      const ctx = await gatherContext();
+      const iterations = buildMindmapIterations(ctx, mode);
+
+      mindmapAbort = new AbortController();
+
+      for (let i = 0; i < iterations.length; i++) {
+        if (mindmapAbort.signal.aborted) break;
+        const it = iterations[i];
+
+        // The current mindmap is carried over from the output (edited by the user
+        // or produced by the previous page iteration) and sent to the AI to
+        // complete/improve.
+        const currentMindmap = els.mindmapOutput.value || '';
+
+        // Debug: show the actual current mindmap being sent to the AI
+        debugLog('MAP', it.label + ': current mindmap sent to AI (' + currentMindmap.length + ' chars)',
+          currentMindmap && currentMindmap.trim() ? currentMindmap : '(empty — generating a new mindmap)');
+
+        els.mindmapStatus.textContent = iterations.length > 1
+          ? I18N.t('ai.mindmapStatus.generating') + ' ' + it.label
+          : I18N.t('ai.mindmapStatus.generating');
+
+        const prompt = buildMindmapPrompt(it.text, maxLevels, currentMindmap, settings.pdfContext, settings.mindmapTemplate);
+        const messages = [];
+        if (settings.systemPrompt && settings.systemPrompt.trim()) {
+          messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+        }
+        messages.push({ role: 'user', content: prompt });
+
+        els.mindmapOutput.value = '';
+        try {
+          const result = await chatWithRetry({
+            host: settings.host,
+            model: settings.model,
+            messages,
+            stream: settings.streaming,
+            maxTokens: settings.maxTokens,
+            numCtx: settings.numCtx,
+            think: settings.reasoning,
+            signal: mindmapAbort.signal,
+            onChunk: (c) => { els.mindmapOutput.value += c; },
+            onStats: (s) => {
+              debugLog('REQ', 'Mindmap (' + it.label + '): POST ' + s.url + ' | model=' + s.model +
+                ' | stream=' + s.stream + ' | think=' + s.think +
+                ' | maxTokens=' + s.maxTokens + ' | numCtx=' + s.numCtx +
+                ' | messages=' + s.messageCount + ' | promptLen=' + s.requestLength);
+              debugLog('BODY', s.requestBody);
+              debugLog('RESP', 'Mindmap (' + it.label + '): response length ' + s.responseLength + ' chars', s.responseText);
+              debugLog('TIME', 'Mindmap (' + it.label + '): first token ' + formatMs(s.timeToFirstTokenMs) +
+                ' | total ' + formatMs(s.totalTimeMs));
+            },
+          }, {
+            id: 'mindmap',
+            label: it.label,
+            abortController: mindmapAbort,
+            statusEl: els.mindmapStatus,
+            onClear: function () { els.mindmapOutput.value = ''; },
+          });
+          if (!settings.streaming) els.mindmapOutput.value = result;
+          // The improved mindmap now lives in the output and becomes the
+          // "current mindmap" for the next page iteration.
+        } catch (err) {
+          // Restore the mindmap we had before this iteration so work isn't lost
+          if (currentMindmap) els.mindmapOutput.value = currentMindmap;
+          throw err;
+        }
+      }
+
+      if (mindmapAbort.signal.aborted) {
+        els.mindmapStatus.textContent = I18N.t('ai.mindmapStatus.stopped');
+      } else {
+        els.mindmapStatus.textContent = '✓ ' + I18N.t('ai.mindmapStatus.done');
+        playCompletionSound();
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        els.mindmapStatus.textContent = I18N.t('ai.mindmapStatus.stopped');
+      } else {
+        debugLog('ERR', 'Mindmap: all ' + MAX_RETRIES + ' attempts failed — ' + (err.message || err));
+        els.mindmapStatus.innerHTML = '⚠️ ' + escapeHtml(err.message || '');
+        playErrorSound();
+      }
+    } finally {
+      mindmapAbort = null;
+      els.mindmapRun.disabled = false;
+      els.mindmapStop.hidden = true;
+    }
+  }
+
+  function onMindmapStop() {
+    if (mindmapAbort) mindmapAbort.abort();
+  }
+
+  function onMindmapClear() {
+    els.mindmapOutput.value = '';
+    els.mindmapStatus.textContent = I18N.t('ai.mindmapStatus.empty');
+    debugLog('MAP', 'Mindmap cleared by user');
   }
 
   /* ---------- Auto-annotate ---------- */

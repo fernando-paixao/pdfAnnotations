@@ -598,6 +598,16 @@ body.ai-open .ai-backdrop {
   font-size: 11px;
 }
 
+/* Mindmap output (monospace, preserves indentation) */
+.ai-form .ai-mindmap-output {
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 4;
+  min-height: 200px;
+}
+
 /* Nested collapsible subsection (e.g. System Prompt) */
 .ai-subsection {
   background: var(--bg);
@@ -672,6 +682,8 @@ body.ai-open .ai-backdrop {
 .ai-response-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 14px 0;
 }
 .view-toggle {
@@ -692,6 +704,31 @@ body.ai-open .ai-backdrop {
 }
 .view-btn:hover { color: var(--text); background: var(--bg-elev); }
 .view-btn.active { background: var(--accent); color: #fff; }
+
+/* Copy response button (top + bottom) */
+.copy-response-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.copy-response-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.copy-response-btn.copied { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* Bottom copy action row */
+.ai-response-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 14px 12px;
+}
 
 /* Markdown rendered body */
 .markdown-body { white-space: normal; }
@@ -827,6 +864,7 @@ body.ai-open .ai-backdrop {
 .debug-tag-TEST  { background: #1c7ed6; color: #fff; }
 .debug-tag-FUZZY { background: #f08c00; color: #fff; }
 .debug-tag-PARSE { background: #0ca678; color: #fff; }
+.debug-tag-MAP   { background: #c2255c; color: #fff; }
 .debug-data {
   display: block;
   margin-top: 2px;

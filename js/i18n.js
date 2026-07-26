@@ -89,6 +89,7 @@ const I18N = (() => {
       'ai.viewText': 'Text',
       'ai.viewMarkdown': 'Markdown',
       'ai.responseEmpty': 'Response will appear here.',
+      'ai.copy': 'Copy',
 
       // Auto-annotate
       'ai.autoAnnotate': 'Auto-Annotate',
@@ -100,6 +101,31 @@ const I18N = (() => {
       'ai.autoTemplatePlaceholder': 'Template is empty — the built-in default will be used.',
       'ai.autoResetTpl': 'Reset to default',
       'ai.autoRun': 'Annotate',
+
+      // Mindmap
+      'ai.mindmap': 'Mindmap',
+      'ai.mindmapHint': 'AI builds a topic mindmap from the selected page range using 4-space indentation. Running again continues/completes the current mindmap.',
+      'ai.mindmapMaxLevels': 'Max topic levels (optional)',
+      'ai.mindmapLevelsPlaceholder': 'leave empty = no limit',
+      'ai.mindmapMode': 'Processing mode',
+      'ai.mindmapMode.all': 'All pages at once',
+      'ai.mindmapMode.perPage': 'Page by page (iterate & improve)',
+      'ai.mindmapModeHint': '"Page by page" feeds one page at a time, carrying the mindmap forward so each page improves on the previous one.',
+      'ai.mindmapRun': 'Generate',
+      'ai.mindmapClear': 'Clear',
+      'ai.mindmapOutputPlaceholder': 'The mindmap will appear here. You can edit it, then click Generate again so the AI continues it.',
+      'ai.mindmapStatus.generating': 'Generating mindmap…',
+      'ai.mindmapStatus.done': 'Mindmap updated.',
+      'ai.mindmapStatus.stopped': 'Stopped.',
+      'ai.mindmapStatus.empty': 'Mindmap cleared.',
+      'ai.mindmapTemplate': 'Prompt Template',
+      'ai.mindmapTemplatePlaceholder': 'Template is empty — the built-in default will be used.',
+      'ai.mindmapResetTpl': 'Reset to default',
+      'ai.mindmapTemplateHint': 'Placeholders:',
+      'ai.mindmapTemplateHintLevels': '(depth-limit instruction)',
+      'ai.mindmapTemplateHintMap': '(current mindmap to continue)',
+      'ai.mindmapTemplateHintCtx': '(your context)',
+      'ai.mindmapTemplateHintText': '(page text).',
 
       // Debug
       'ai.debug': 'Debug',
@@ -151,6 +177,18 @@ const I18N = (() => {
         '',
         'Page text:',
         '$pageText',
+      ].join('\n'),
+
+      'ai.defaultMindmapPrompt': [
+        'You are building a mindmap from the text below.',
+        'Organize the content as a hierarchy of topics in PLAIN TEXT only.',
+        'Indentation rule: use EXACTLY 4 spaces per level. The central topic has 0 spaces; each deeper level adds 4 more spaces. Do NOT use bullets, dashes, numbers, or markdown.',
+        '$maxLevels',
+        '$currentMindmap',
+        'Output ONLY the mindmap text — no explanations, no code fences, no extra commentary.',
+        '',
+        'Text:',
+        '$text',
       ].join('\n'),
 
       // Toast / prompt messages
@@ -262,6 +300,7 @@ const I18N = (() => {
       'ai.viewText': 'Texto',
       'ai.viewMarkdown': 'Markdown',
       'ai.responseEmpty': 'A resposta aparecerá aqui.',
+      'ai.copy': 'Copiar',
 
       // Auto-annotate
       'ai.autoAnnotate': 'Auto-Anotar',
@@ -273,6 +312,31 @@ const I18N = (() => {
       'ai.autoTemplatePlaceholder': 'Modelo vazio — o padrão será usado.',
       'ai.autoResetTpl': 'Restaurar padrão',
       'ai.autoRun': 'Anotar',
+
+      // Mindmap
+      'ai.mindmap': 'Mindmap',
+      'ai.mindmapHint': 'A IA constrói um mindmap de tópicos a partir do intervalo de páginas selecionado, usando indentação de 4 espaços. Executar novamente continua/completa o mindmap atual.',
+      'ai.mindmapMaxLevels': 'Níveis máx. de tópicos (opcional)',
+      'ai.mindmapLevelsPlaceholder': 'vazio = sem limite',
+      'ai.mindmapMode': 'Modo de processamento',
+      'ai.mindmapMode.all': 'Todas as páginas de uma vez',
+      'ai.mindmapMode.perPage': 'Página por página (iterar e melhorar)',
+      'ai.mindmapModeHint': '"Página por página" envia uma página por vez, carregando o mindmap adiante para que cada página melhore o anterior.',
+      'ai.mindmapRun': 'Gerar',
+      'ai.mindmapClear': 'Limpar',
+      'ai.mindmapOutputPlaceholder': 'O mindmap aparecerá aqui. Você pode editá-lo e clicar em Gerar novamente para a IA continuar.',
+      'ai.mindmapStatus.generating': 'Gerando mindmap…',
+      'ai.mindmapStatus.done': 'Mindmap atualizado.',
+      'ai.mindmapStatus.stopped': 'Interrompido.',
+      'ai.mindmapStatus.empty': 'Mindmap limpo.',
+      'ai.mindmapTemplate': 'Modelo de Prompt',
+      'ai.mindmapTemplatePlaceholder': 'O modelo está vazio — o padrão embutido será usado.',
+      'ai.mindmapResetTpl': 'Restaurar padrão',
+      'ai.mindmapTemplateHint': 'Placeholders:',
+      'ai.mindmapTemplateHintLevels': '(instrução de limite de profundidade)',
+      'ai.mindmapTemplateHintMap': '(mindmap atual para continuar)',
+      'ai.mindmapTemplateHintCtx': '(seu contexto)',
+      'ai.mindmapTemplateHintText': '(texto da página).',
 
       // Debug
       'ai.debug': 'Debug',
@@ -324,6 +388,18 @@ const I18N = (() => {
         '',
         'Texto da página:',
         '$pageText',
+      ].join('\n'),
+
+      'ai.defaultMindmapPrompt': [
+        'Você está construindo um mindmap a partir do texto abaixo.',
+        'Organize o conteúdo como uma hierarquia de tópicos em TEXTO PURO.',
+        'Regra de indentação: use EXATAMENTE 4 espaços por nível. O tópico central tem 0 espaços; cada nível mais profundo adiciona 4 espaços. NÃO use marcadores, traços, números ou markdown.',
+        '$maxLevels',
+        '$currentMindmap',
+        'Retorne APENAS o texto do mindmap — sem explicações, sem cercas de código, sem comentários extras.',
+        '',
+        'Texto:',
+        '$text',
       ].join('\n'),
 
       // Toast / prompt messages
