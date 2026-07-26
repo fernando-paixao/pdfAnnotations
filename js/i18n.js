@@ -47,6 +47,9 @@ const I18N = (() => {
       'editor.notePlaceholder': 'Add a note (optional)…',
       'editor.delete': 'Delete',
       'editor.save': 'Save',
+      'editor.adjustSelection': 'Adjust selection',
+      'editor.expandLeft': 'Expand left (one word)',
+      'editor.expandRight': 'Expand right (one word)',
 
       // AI Panel
       'ai.assistant': 'AI Assistant',
@@ -258,6 +261,9 @@ const I18N = (() => {
       'editor.notePlaceholder': 'Adicione uma nota (opcional)…',
       'editor.delete': 'Excluir',
       'editor.save': 'Salvar',
+      'editor.adjustSelection': 'Ajustar seleção',
+      'editor.expandLeft': 'Expandir à esquerda (uma palavra)',
+      'editor.expandRight': 'Expandir à direita (uma palavra)',
 
       // AI Panel
       'ai.assistant': 'Assistente IA',

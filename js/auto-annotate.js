@@ -92,6 +92,15 @@ const AutoAnnotate = (() => {
   function init() {}
 
   /**
+   * Yield to the event loop so the browser can paint debug messages
+   * and respond to user input (prevents "page unresponsive" freezes
+   * during long synchronous fuzzy-matching operations).
+   */
+  function yieldToUI() {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  /**
    * Run auto-annotation.
    * @param {Object} opts
    * @param {number|null} opts.howMany   - desired number of annotations (null = AI decides)
@@ -123,125 +132,153 @@ const AutoAnnotate = (() => {
       host: settings.host,
     });
 
-    for (const pg of pages) {
-      if (abortController.signal.aborted) break;
-      if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
-      debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
-
-      const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate, opts.pdfContext);
-      debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
-      const messages = [];
-      if (settings.systemPrompt && settings.systemPrompt.trim()) {
-        messages.push({ role: 'system', content: settings.systemPrompt.trim() });
-      }
-      messages.push({ role: 'user', content: prompt });
-      let raw;
-      try {
-        raw = await chatWithRetry({
-          host: settings.host,
-          model: settings.model,
-          messages,
-          stream: false,
-          maxTokens: settings.maxTokens,
-          numCtx: settings.numCtx,
-          think: settings.reasoning,
-          signal: abortController.signal,
-          onStats: (s) => {
-            debug('REQ', 'Page ' + pg.page + ': POST ' + s.url + ' | model=' + s.model +
-              ' | promptLen=' + s.requestLength);
-            debug('BODY', 'Page ' + pg.page + ': request body', s.requestBody);
-            debug('TIME', 'Page ' + pg.page + ': first token=' + s.timeToFirstTokenMs +
-              'ms | total=' + s.totalTimeMs + 'ms');
-          },
-        }, 'Page ' + pg.page);
-      } catch (err) {
-        if (err && err.name === 'AbortError') { debug('AUTO', 'Aborted by user'); break; }
-        debug('ERR', 'Page ' + pg.page + ': all ' + MAX_RETRIES + ' attempts failed — ' + (err.message || err));
-        if (callbacks.onError) callbacks.onError('Page ' + pg.page + ': failed after ' + MAX_RETRIES + ' retries — ' + (err.message || err));
-        continue;
-      }
-
-      debug('AUTO', 'Page ' + pg.page + ': raw AI response (' + raw.length + ' chars)', raw);
-
-      const passages = parsePassages(raw);
-      debug('AUTO', 'Page ' + pg.page + ': parsed ' + passages.length + ' passage(s) from AI response');
-      if (passages.length === 0) {
-        if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': no passages parsed.');
-        continue;
-      }
-
-      // Build page text index for matching
-      const tc = await PDFViewer.getTextContent(pg.page);
-      if (!tc) continue;
-      const idx = TextGeometry.buildIndex(tc);
-      const baseVp = PDFViewer.getBaseViewport(pg.page);
-      if (!baseVp) continue;
-      const vp = baseVp.clone({ scale: PDFViewer.getScale() });
-      const spanMap = PDFViewer.getSpanMap(pg.page);
-
-      for (const p of passages) {
+    try {
+      for (const pg of pages) {
         if (abortController.signal.aborted) break;
-        total++;
-        const snippet = (p.text || '').trim();
-        if (!snippet) { skipped++; debug('AUTO', 'Page ' + pg.page + ': empty snippet, skipped'); continue; }
-        const range = TextGeometry.findSnippetRange(idx, snippet, (info) => {
-          if (info.type === 'fuzzy-start') {
-            debug('FUZZY', 'Page ' + pg.page + ': strategies 1-3 failed, attempting fuzzy match', {
-              aiOriginal: info.aiOriginal,
-              aiStripped: info.aiStripped,
-              aiWords: info.aiWordCount,
-              pdfWords: info.pdfWordCount,
-            });
-          } else if (info.type === 'fuzzy-match') {
-            debug('FUZZY', 'Page ' + pg.page + ': FUZZY MATCH (score=' + info.score.toFixed(2) +
-              ', ' + info.matchedWords + '/' + info.totalAiWords + ' words, ' + info.skips + ' skips)', {
-              score: info.score,
-              matchedWords: info.matchedWords + '/' + info.totalAiWords,
-              skips: info.skips,
-              skippedAiWords: info.skippedAiWords,
-              pdfMatchedRegion: info.pdfMatchedRegion,
-              pdfMatchedStripped: info.pdfMatchedStripped,
-            });
-          } else if (info.type === 'fuzzy-no-match') {
-            debug('FUZZY', 'Page ' + pg.page + ': fuzzy match failed — ' + info.reason, {
-              aiWordCount: info.aiWordCount,
-              maxSkips: info.maxSkips,
-            });
-          } else if (info.type === 'fuzzy-reject') {
-            debug('FUZZY', 'Page ' + pg.page + ': fuzzy match rejected — ' + info.reason);
-          }
-        });
-        if (!range) {
-          skipped++;
-          debug('AUTO', 'Page ' + pg.page + ': NO MATCH (score below threshold)',
-            '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
+        if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
+        debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
+
+        const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate, opts.pdfContext);
+        debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
+        const messages = [];
+        if (settings.systemPrompt && settings.systemPrompt.trim()) {
+          messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+        }
+        messages.push({ role: 'user', content: prompt });
+        let raw;
+        try {
+          raw = await chatWithRetry({
+            host: settings.host,
+            model: settings.model,
+            messages,
+            stream: false,
+            maxTokens: settings.maxTokens,
+            numCtx: settings.numCtx,
+            think: settings.reasoning,
+            signal: abortController.signal,
+            onStats: (s) => {
+              debug('REQ', 'Page ' + pg.page + ': POST ' + s.url + ' | model=' + s.model +
+                ' | promptLen=' + s.requestLength);
+              debug('BODY', 'Page ' + pg.page + ': request body', s.requestBody);
+              debug('TIME', 'Page ' + pg.page + ': first token=' + s.timeToFirstTokenMs +
+                'ms | total=' + s.totalTimeMs + 'ms');
+            },
+          }, 'Page ' + pg.page);
+        } catch (err) {
+          if (err && err.name === 'AbortError') { debug('AUTO', 'Aborted by user'); break; }
+          debug('ERR', 'Page ' + pg.page + ': all ' + MAX_RETRIES + ' attempts failed — ' + (err.message || err));
+          if (callbacks.onError) callbacks.onError('Page ' + pg.page + ': failed after ' + MAX_RETRIES + ' retries — ' + (err.message || err));
           continue;
         }
-        debug('AUTO', 'Page ' + pg.page + ': matched (score=' + range.score.toFixed(2) + ')',
-          '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
-        const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp, spanMap);
-        if (!rects.length) { skipped++; debug('AUTO', 'Page ' + pg.page + ': matched but no rects'); continue; }
-        const data = {
-          namespaceId: HighlighterCurrentNamespaceId(),
-          page: pg.page,
-          textSelected: snippet.length > 200 ? snippet.slice(0, 200) + '…' : snippet,
-          rects,
-          annotationText: opts.includeNotes && p.note ? p.note.trim() : null,
-          color: '#30a46c', // green tint to distinguish AI annotations
-        };
-        if (callbacks.createAnnotation) {
-          const ann = await callbacks.createAnnotation(data);
-          if (ann) {
-            created++;
-            if (callbacks.onAnnotationCreated) callbacks.onAnnotationCreated(ann);
+
+        debug('AUTO', 'Page ' + pg.page + ': raw AI response (' + raw.length + ' chars)', raw);
+
+        const passages = parsePassages(raw);
+        debug('AUTO', 'Page ' + pg.page + ': parsed ' + passages.length + ' passage(s) from AI response');
+        if (passages.length === 0) {
+          if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': no passages parsed.');
+          continue;
+        }
+
+        // Build page text index for matching
+        const tc = await PDFViewer.getTextContent(pg.page);
+        if (!tc) continue;
+        const idx = TextGeometry.buildIndex(tc);
+        const baseVp = PDFViewer.getBaseViewport(pg.page);
+        if (!baseVp) continue;
+        const vp = baseVp.clone({ scale: PDFViewer.getScale() });
+        const spanMap = PDFViewer.getSpanMap(pg.page);
+
+        for (const p of passages) {
+          if (abortController.signal.aborted) break;
+          total++;
+
+          // Yield before each passage so the browser can paint accumulated
+          // debug messages and stay responsive during long fuzzy matching.
+          await yieldToUI();
+
+          try {
+            const snippet = (p.text || '').trim();
+            if (!snippet) { skipped++; debug('AUTO', 'Page ' + pg.page + ': empty snippet, skipped'); continue; }
+            const range = TextGeometry.findSnippetRange(idx, snippet, (info) => {
+              if (info.type === 'fuzzy-start') {
+                debug('FUZZY', 'Page ' + pg.page + ': strategies 1-3 failed, attempting fuzzy match', {
+                  aiOriginal: info.aiOriginal,
+                  aiStripped: info.aiStripped,
+                  aiWords: info.aiWordCount,
+                  pdfWords: info.pdfWordCount,
+                });
+              } else if (info.type === 'fuzzy-match') {
+                debug('FUZZY', 'Page ' + pg.page + ': FUZZY MATCH (score=' + info.score.toFixed(2) +
+                  ', ' + info.matchedWords + '/' + info.totalAiWords + ' words, ' + info.skips + ' skips)', {
+                  score: info.score,
+                  matchedWords: info.matchedWords + '/' + info.totalAiWords,
+                  skips: info.skips,
+                  skippedAiWords: info.skippedAiWords,
+                  pdfMatchedRegion: info.pdfMatchedRegion,
+                  pdfMatchedStripped: info.pdfMatchedStripped,
+                });
+              } else if (info.type === 'fuzzy-no-match') {
+                debug('FUZZY', 'Page ' + pg.page + ': fuzzy match failed — ' + info.reason, {
+                  aiWordCount: info.aiWordCount,
+                  maxSkips: info.maxSkips,
+                });
+              } else if (info.type === 'fuzzy-reject') {
+                debug('FUZZY', 'Page ' + pg.page + ': fuzzy match rejected — ' + info.reason);
+              }
+            });
+            if (!range) {
+              skipped++;
+              debug('AUTO', 'Page ' + pg.page + ': NO MATCH (score below threshold)',
+                '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
+              continue;
+            }
+            debug('AUTO', 'Page ' + pg.page + ': matched (score=' + range.score.toFixed(2) + ')',
+              '"' + snippet.slice(0, 80) + (snippet.length > 80 ? '…' : '') + '"');
+            const rects = TextGeometry.rangeToRects(idx, range.start, range.end, vp, spanMap);
+            if (!rects.length) { skipped++; debug('AUTO', 'Page ' + pg.page + ': matched but no rects'); continue; }
+            const data = {
+              namespaceId: HighlighterCurrentNamespaceId(),
+              page: pg.page,
+              textSelected: snippet.length > 200 ? snippet.slice(0, 200) + '…' : snippet,
+              rects,
+              annotationText: opts.includeNotes && p.note ? p.note.trim() : null,
+              color: '#30a46c', // green tint to distinguish AI annotations
+            };
+            if (callbacks.createAnnotation) {
+              const ann = await callbacks.createAnnotation(data);
+              if (ann) {
+                created++;
+                if (callbacks.onAnnotationCreated) callbacks.onAnnotationCreated(ann);
+              }
+            }
+          } catch (passageErr) {
+            // An error on ONE passage must NOT kill the entire run.
+            // Log it, count it as skipped, and continue with the next passage.
+            skipped++;
+            debug('ERR', 'Page ' + pg.page + ': passage processing error — ' +
+              (passageErr && passageErr.message ? passageErr.message : passageErr),
+              passageErr && passageErr.stack ? passageErr.stack : undefined);
           }
         }
+        if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': done.');
       }
-      if (callbacks.onProgress) callbacks.onProgress('Page ' + pg.page + ': done.');
+    } catch (runErr) {
+      // Top-level safety net: any unexpected error is logged and reported
+      // so the UI doesn't stay stuck in "processing…" forever.
+      if (runErr && runErr.name === 'AbortError') {
+        debug('AUTO', 'Aborted by user');
+      } else {
+        debug('ERR', 'Auto-annotate unexpected error — ' +
+          (runErr && runErr.message ? runErr.message : runErr),
+          runErr && runErr.stack ? runErr.stack : undefined);
+        if (callbacks.onError) callbacks.onError('Unexpected error — ' +
+          (runErr && runErr.message ? runErr.message : runErr));
+      }
+    } finally {
+      debug('AUTO', 'Auto-annotate complete', { created, skipped, total });
+      if (callbacks.onComplete) callbacks.onComplete({ created, skipped, total });
     }
-
-    debug('AUTO', 'Auto-annotate complete', { created, skipped, total });
-    if (callbacks.onComplete) callbacks.onComplete({ created, skipped, total });
   }
 
   function abort() {

@@ -164,7 +164,12 @@
   AIPanel.callbacks.onAutoAnnotate = (opts) => {
     if (opts.abort) { AutoAnnotate.abort(); return; }
     AutoAnnotate.setNamespaceId(currentNamespaceId);
-    AutoAnnotate.run(opts);
+    AutoAnnotate.run(opts).catch((err) => {
+      // Safety net: ensure the UI recovers even if run() rejects unexpectedly
+      console.error('Auto-annotate run() failed', err);
+      AIPanel.setAutoStatus('⚠️ ' + (err && err.message ? err.message : err));
+      AIPanel.setAutoDone();
+    });
   };
 
   // Backdrop click closes the panel

@@ -305,3 +305,13 @@ Como viver na prática os ensinamentos do texto abaixo:
 
 $text
 ---
+Can you add two arrows above an annotation that would cover one more word to the annotation when clicked
+
+*This is a kind of try to mitigate the problem of the rectangle of selection didn't cover exactly the visible text
+---
+For the same purpose can you give me a kind of calibrate feature, where when the user click it will select the first word on the actual page and the user will have an option to enlarge on make smaller the selection rectangle of selection.
+
+This will be used as factor to next selections.
+
+Or if you have a suggestion about use maybe a param of blank spacing between characters.
+---

@@ -407,6 +407,29 @@ button.danger:hover { background: var(--danger); color: #fff; }
   padding: 10px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.5);
 }
+.editor-expand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.editor-expand-label {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.expand-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.expand-btn:hover { background: var(--accent); border-color: var(--accent); }
+.expand-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .editor-popover textarea {
   width: 100%;
   min-height: 70px;

@@ -10,6 +10,8 @@ const Highlighter = (() => {
   let editorText = null;
   let editorSave = null;
   let editorDelete = null;
+  let editorExpandLeft = null;
+  let editorExpandRight = null;
   let viewerEl = null;
 
   // page -> Map(annotationId -> annotation)
@@ -34,6 +36,8 @@ const Highlighter = (() => {
     editorText = popover.querySelector('#editorText');
     editorSave = popover.querySelector('#editorSave');
     editorDelete = popover.querySelector('#editorDelete');
+    editorExpandLeft = popover.querySelector('#editorExpandLeft');
+    editorExpandRight = popover.querySelector('#editorExpandRight');
 
     // Show highlight button on text selection
     document.addEventListener('mouseup', () => setTimeout(updateSelectionButton, 10));
@@ -47,6 +51,8 @@ const Highlighter = (() => {
 
     editorSave.addEventListener('click', onEditorSave);
     editorDelete.addEventListener('click', onEditorDelete);
+    editorExpandLeft.addEventListener('click', () => onExpandSelection('left'));
+    editorExpandRight.addEventListener('click', () => onExpandSelection('right'));
 
     // Close popover when clicking outside
     document.addEventListener('mousedown', (e) => {
@@ -306,6 +312,66 @@ const Highlighter = (() => {
     closeEditor();
     removeAnnotationDraw(id);
     if (callbacks.deleteAnnotation) await callbacks.deleteAnnotation(id);
+    if (callbacks.annotationChanged) callbacks.annotationChanged();
+  }
+
+  /* ---------- Expand selection by one word ---------- */
+  async function onExpandSelection(direction) {
+    if (activeAnnotationId == null) return;
+    const ann = byId.get(activeAnnotationId);
+    if (!ann) return;
+
+    // Build page text index
+    const tc = await PDFViewer.getTextContent(ann.page);
+    if (!tc) return;
+    const idx = TextGeometry.buildIndex(tc);
+
+    // Find the annotation's current text in the page
+    const snippet = ann.textSelected || '';
+    if (!snippet.trim()) return;
+    const range = TextGeometry.findSnippetRange(idx, snippet);
+    if (!range) return;
+
+    // Expand by one word
+    let newStart = range.start;
+    let newEnd = range.end;
+    if (direction === 'left') {
+      // Move start left: skip whitespace, then include the previous word
+      let s = newStart;
+      while (s > 0 && /\s/.test(idx.full[s - 1])) s--;
+      while (s > 0 && !/\s/.test(idx.full[s - 1])) s--;
+      if (s < newStart) newStart = s;
+    } else {
+      // Move end right: skip whitespace, then include the next word
+      let e = newEnd;
+      while (e < idx.full.length && /\s/.test(idx.full[e])) e++;
+      while (e < idx.full.length && !/\s/.test(idx.full[e])) e++;
+      if (e > newEnd) newEnd = e;
+    }
+
+    // Nothing changed (already at boundary)
+    if (newStart === range.start && newEnd === range.end) return;
+
+    // Extract the new text
+    const newText = idx.full.slice(newStart, newEnd).trim();
+    if (!newText || newText === ann.textSelected) return;
+
+    // Recalculate rects for the expanded range
+    const baseVp = PDFViewer.getBaseViewport(ann.page);
+    if (!baseVp) return;
+    const vp = baseVp.clone({ scale: PDFViewer.getScale() });
+    const spanMap = PDFViewer.getSpanMap(ann.page);
+    const newRects = TextGeometry.rangeToRects(idx, newStart, newEnd, vp, spanMap);
+    if (!newRects.length) return;
+
+    // Update annotation
+    ann.textSelected = newText;
+    ann.rects = newRects;
+    ann.updatedAt = Date.now();
+
+    // Persist and redraw
+    if (callbacks.updateAnnotation) await callbacks.updateAnnotation(ann);
+    refreshAnnotation(ann);
     if (callbacks.annotationChanged) callbacks.annotationChanged();
   }
 

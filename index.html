@@ -97,6 +97,11 @@
 
   <!-- Highlight editor popover -->
   <div id="editorPopover" class="editor-popover" hidden>
+    <div class="editor-expand-row">
+      <span class="editor-expand-label" data-i18n="editor.adjustSelection">Adjust selection</span>
+      <button id="editorExpandLeft" class="expand-btn" data-i18n-title="editor.expandLeft" title="Expand left (one word)">◀</button>
+      <button id="editorExpandRight" class="expand-btn" data-i18n-title="editor.expandRight" title="Expand right (one word)">▶</button>
+    </div>
     <textarea id="editorText" data-i18n-placeholder="editor.notePlaceholder" placeholder="Add a note (optional)…"></textarea>
     <div class="editor-actions">
       <button id="editorDelete" class="danger" data-i18n="editor.delete">Delete</button>
