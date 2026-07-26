@@ -21,6 +21,10 @@ const Highlighter = (() => {
   let currentNamespaceId = null;
   let activeAnnotationId = null; // annotation being edited in popover
 
+  // Calibration: horizontal padding applied to all rects at draw time.
+  // Values are fractions of rect width (e.g. 0.1 = grow 10% on that side).
+  let calibration = { padLeft: 0, padRight: 0 };
+
   const callbacks = {
     createAnnotation: null,  // async (data) -> ann
     updateAnnotation: null,  // async (ann)
@@ -58,6 +62,7 @@ const Highlighter = (() => {
     document.addEventListener('mousedown', (e) => {
       if (editorPopover.hidden) return;
       if (editorPopover.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('#calibrateOverlay')) return;
       if (e.target.classList && e.target.classList.contains('highlight-rect')) return;
       closeEditor();
     });
@@ -199,16 +204,22 @@ const Highlighter = (() => {
     // Remove existing rect(s) for this annotation
     layer.querySelectorAll(`[data-ann-id="${ann.id}"]`).forEach((el) => el.remove());
     ann.rects.forEach((r, idx) => {
+      const cr = applyCalibration(r);
       const div = document.createElement('div');
       div.className = 'highlight-rect';
       if (ann.annotationText) div.classList.add('has-note');
       div.dataset.annId = ann.id;
       div.dataset.rectIdx = idx;
-      div.style.left = (r.x * 100) + '%';
-      div.style.top = (r.y * 100) + '%';
-      div.style.width = (r.width * 100) + '%';
-      div.style.height = (r.height * 100) + '%';
-      div.title = ann.annotationText || ann.textSelected.slice(0, 80);
+      div.style.left = (cr.x * 100) + '%';
+      div.style.top = (cr.y * 100) + '%';
+      div.style.width = (cr.width * 100) + '%';
+      div.style.height = (cr.height * 100) + '%';
+      const baseTitle = ann.annotationText || ann.textSelected.slice(0, 80);
+      if (document.body.classList.contains('debug-text')) {
+        div.title = `[${r.x.toFixed(3)},${r.y.toFixed(3)} ${r.width.toFixed(3)}×${r.height.toFixed(3)}] → [${cr.x.toFixed(3)},${cr.y.toFixed(3)} ${cr.width.toFixed(3)}×${cr.height.toFixed(3)}] ${baseTitle}`;
+      } else {
+        div.title = baseTitle;
+      }
       div.addEventListener('click', (e) => {
         e.stopPropagation();
         openEditorFor(ann.id, e.clientX, e.clientY);
@@ -375,6 +386,35 @@ const Highlighter = (() => {
     if (callbacks.annotationChanged) callbacks.annotationChanged();
   }
 
+  /* ---------- Calibration ---------- */
+
+  /**
+   * Apply horizontal padding calibration to a normalized rect.
+   * @param {{x,y,width,height}} r — original rect (fractions of page)
+   * @returns {{x,y,width,height}} calibrated rect
+   */
+  function applyCalibration(r) {
+    const dx = r.width * calibration.padLeft;
+    return {
+      x: r.x - dx,
+      y: r.y,
+      width: r.width * (1 + calibration.padLeft + calibration.padRight),
+      height: r.height,
+    };
+  }
+
+  function setCalibration(c) {
+    calibration = { padLeft: 0, padRight: 0, ...c };
+    redrawAll();
+  }
+
+  function getCalibration() { return { ...calibration }; }
+
+  function redrawAll() {
+    const n = PDFViewer.getNumPages();
+    for (let i = 1; i <= n; i++) redrawPage(i);
+  }
+
   function clear() {
     byPage.clear();
     byId.clear();
@@ -387,6 +427,7 @@ const Highlighter = (() => {
   return {
     init, setNamespaceId, setPdfId, setAnnotations, redrawPage, drawAnnotation,
     refreshAnnotation, removeAnnotationDraw, flashAnnotation, clear,
+    setCalibration, getCalibration, redrawAll,
     callbacks,
   };
 })();

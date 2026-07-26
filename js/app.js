@@ -36,6 +36,7 @@
   const nsRenameBtn = $('nsRename');
   const nsDeleteBtn = $('nsDelete');
   const langSelect = $('langSelect');
+  const debugTextBtn = $('debugTextBtn');
 
   // ---------- Helpers ----------
   function uuid() {
@@ -102,6 +103,144 @@
   Highlighter.callbacks.onAnnotationClicked = (id) => {
     AnnotationsUI.scrollToAnnotation(id);
   };
+
+  // ---------- Calibration (highlight width adjustment) ----------
+  const calibrateOverlay = $('calibrateOverlay');
+  const calBtn = $('calibrateBtn');
+  const calLeftSlider = $('calLeft');
+  const calRightSlider = $('calRight');
+  const calLeftVal = $('calLeftVal');
+  const calRightVal = $('calRightVal');
+
+  function updateCalDisplay() {
+    const c = Highlighter.getCalibration();
+    calLeftSlider.value = c.padLeft;
+    calRightSlider.value = c.padRight;
+    calLeftVal.textContent = (c.padLeft * 100).toFixed(0) + '%';
+    calRightVal.textContent = (c.padRight * 100).toFixed(0) + '%';
+  }
+
+  function applyCalFromSliders() {
+    Highlighter.setCalibration({
+      padLeft: parseFloat(calLeftSlider.value) || 0,
+      padRight: parseFloat(calRightSlider.value) || 0,
+    });
+    calLeftVal.textContent = (parseFloat(calLeftSlider.value) * 100).toFixed(0) + '%';
+    calRightVal.textContent = (parseFloat(calRightSlider.value) * 100).toFixed(0) + '%';
+  }
+
+  // Open calibration overlay
+  if (calBtn) {
+    calBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calibrateOverlay.hidden = false;
+      updateCalDisplay();
+      populateCustomCssFromLive();
+    });
+  }
+
+  // Close button
+  $('calClose').addEventListener('click', () => { calibrateOverlay.hidden = true; });
+
+  // Slider live preview
+  calLeftSlider.addEventListener('input', applyCalFromSliders);
+  calRightSlider.addEventListener('input', applyCalFromSliders);
+
+  // +/- buttons (step 0.02 = 2%)
+  const STEP = 0.02;
+  $('calLeftMinus').addEventListener('click', () => {
+    calLeftSlider.value = Math.max(-0.5, parseFloat(calLeftSlider.value) - STEP);
+    applyCalFromSliders();
+  });
+  $('calLeftPlus').addEventListener('click', () => {
+    calLeftSlider.value = Math.min(0.5, parseFloat(calLeftSlider.value) + STEP);
+    applyCalFromSliders();
+  });
+  $('calRightMinus').addEventListener('click', () => {
+    calRightSlider.value = Math.max(-0.5, parseFloat(calRightSlider.value) - STEP);
+    applyCalFromSliders();
+  });
+  $('calRightPlus').addEventListener('click', () => {
+    calRightSlider.value = Math.min(0.5, parseFloat(calRightSlider.value) + STEP);
+    applyCalFromSliders();
+  });
+
+  // Reset
+  $('calReset').addEventListener('click', () => {
+    calLeftSlider.value = 0;
+    calRightSlider.value = 0;
+    applyCalFromSliders();
+  });
+
+  // Save (persist to localStorage per PDF)
+  $('calSave').addEventListener('click', () => {
+    if (currentPdfId) {
+      const c = Highlighter.getCalibration();
+      localStorage.setItem('calibration_' + currentPdfId, JSON.stringify(c));
+      // Also persist custom CSS
+      const css = $('debugCustomCss').value.trim();
+      if (css) localStorage.setItem('debugCss_' + currentPdfId, css);
+      else localStorage.removeItem('debugCss_' + currentPdfId);
+    }
+    calibrateOverlay.hidden = true;
+    showToast(I18N.t('msg.calibrationSaved'));
+  });
+
+  // ---------- Custom CSS for text layer (debug) ----------
+  const debugCustomCss = $('debugCustomCss');
+  let customStyleEl = null;
+
+  function applyCustomCss() {
+    const css = debugCustomCss.value.trim();
+    if (!css) {
+      if (customStyleEl) { customStyleEl.remove(); customStyleEl = null; }
+      return;
+    }
+    if (!customStyleEl) {
+      customStyleEl = document.createElement('style');
+      customStyleEl.id = 'debugCustomCssStyle';
+      document.head.appendChild(customStyleEl);
+    }
+    customStyleEl.textContent = css;
+  }
+
+  debugCustomCss.addEventListener('input', applyCustomCss);
+
+  /** Reads actual computed styles from the first text-layer span on the current page
+   *  and returns a CSS template the user can tweak. */
+  function computeCurrentTextLayerCss() {
+    const wrapper = PDFViewer.getPageWrapper(currentPage);
+    if (!wrapper) return '';
+    const span = wrapper.querySelector('.textLayer span');
+    if (!span) return '';
+    const cs = getComputedStyle(span);
+    const props = [
+      'font-family',
+      'font-size',
+      'letter-spacing',
+      'word-spacing',
+      'line-height',
+      'transform',
+      'transform-origin',
+    ];
+    const lines = [];
+    for (const p of props) {
+      const v = cs.getPropertyValue(p);
+      if (v) lines.push('  ' + p + ': ' + v + ';');
+    }
+    return '.textLayer span {\n' + lines.join('\n') + '\n}';
+  }
+
+  /** Pre-populate the custom CSS textarea with actual values (only if empty). */
+  function populateCustomCssFromLive() {
+    if (!debugCustomCss || debugCustomCss.value.trim()) return; // don't overwrite
+    const css = computeCurrentTextLayerCss();
+    if (!css) return;
+    debugCustomCss.value = css;
+    // Auto-open the details section so the user sees it
+    const details = debugCustomCss.closest('details');
+    if (details) details.open = true;
+  }
 
   AnnotationsUI.init($('annotationList'), $('annotationCount'), searchBox, $('emptyAnnotations'));
   AnnotationsUI.callbacks.onJump = (id) => {
@@ -288,6 +427,24 @@
       const pdfId = await Storage.hashFile(file);
       currentPdfId = pdfId;
 
+      // Load saved calibration for this PDF (if any)
+      const savedCal = localStorage.getItem('calibration_' + pdfId);
+      if (savedCal) {
+        try { Highlighter.setCalibration(JSON.parse(savedCal)); } catch (_) {}
+      } else {
+        Highlighter.setCalibration({ padLeft: 0, padRight: 0 });
+      }
+
+      // Load saved custom debug CSS for this PDF (if any)
+      const savedCss = localStorage.getItem('debugCss_' + pdfId);
+      if (savedCss && debugCustomCss) {
+        debugCustomCss.value = savedCss;
+        applyCustomCss();
+      } else if (debugCustomCss) {
+        debugCustomCss.value = '';
+        applyCustomCss();
+      }
+
       // 2) Migrate old annotations (v1 format with pdfId but no namespaceId)
       const migratedNs = await Storage.migrateOldAnnotations(pdfId, file.name);
 
@@ -327,6 +484,7 @@
       searchGroup.hidden = false;
       namespaceBar.hidden = false;
       searchBox.hidden = false;
+      debugTextBtn.hidden = false;
       zoomLevel.textContent = Math.round(PDFViewer.getScale() * 100) + '%';
       await Storage.savePdfMeta({
         pdfId, fileName: file.name, numPages: PDFViewer.getNumPages(), lastOpened: Date.now(),
@@ -368,6 +526,14 @@
 
   $('zoomIn').addEventListener('click', () => PDFViewer.zoomIn());
   $('zoomOut').addEventListener('click', () => PDFViewer.zoomOut());
+
+  // ---------- Debug: toggle text layer visibility ----------
+  debugTextBtn.addEventListener('click', () => {
+    const isActive = document.body.classList.toggle('debug-text');
+    debugTextBtn.classList.toggle('active', isActive);
+    // Redraw annotations so tooltips show/hide rect coordinates
+    Highlighter.redrawAll();
+  });
 
   // Keyboard shortcuts when viewer focused
   viewer.addEventListener('keydown', (e) => {

@@ -121,6 +121,19 @@ button.danger:hover { background: var(--danger); color: #fff; }
 }
 .search-group button { padding: 6px 8px; }
 
+/* Debug text-layer toggle button */
+.debug-btn {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+}
+.debug-btn:hover { background: var(--accent); border-color: var(--accent); }
+.debug-btn.active { background: var(--danger); border-color: var(--danger); }
+
 /* ===== Main layout ===== */
 #main {
   display: flex;
@@ -230,6 +243,22 @@ button.danger:hover { background: var(--danger); color: #fff; }
 }
 /* mark elements are used by PDF.js in some versions; keep transparent */
 .textLayer mark { color: transparent; background: transparent; }
+
+/* ===== Debug mode: show text layer (toggle via 🐛 button) ===== */
+body.debug-text .textLayer span {
+  color: rgba(0, 0, 0, 0.85) !important;
+  background: rgba(255, 212, 0, 0.12);
+  outline: 1px dashed rgba(0, 0, 0, 0.35);
+}
+body.debug-text .page-wrapper canvas {
+  opacity: 0.15;
+}
+/* Make highlight rects more visible in debug mode */
+body.debug-text .highlight-rect {
+  mix-blend-mode: normal;
+  background: rgba(124, 92, 255, 0.25);
+  border: 2px solid rgba(124, 92, 255, 0.8);
+}
 
 /* ===== Side panel ===== */
 #sidePanel {
@@ -443,6 +472,141 @@ button.danger:hover { background: var(--danger); color: #fff; }
   font-size: 13px;
 }
 .editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ===== Calibration overlay ===== */
+.calibrate-overlay {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+}
+.calibrate-panel {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  width: 300px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.calibrate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.calibrate-header h3 { margin: 0; font-size: 14px; }
+.cal-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.cal-close:hover { color: var(--text); background: var(--bg); }
+.calibrate-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+.calibrate-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+.calibrate-row label {
+  width: 50px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.calibrate-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.cal-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cal-btn:hover { background: var(--accent); border-color: var(--accent); }
+.cal-val {
+  width: 32px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.calibrate-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* Custom CSS section inside calibration overlay */
+.cal-css-section {
+  margin-top: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-css-section > summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  user-select: none;
+}
+.cal-css-section > summary:hover { color: var(--accent); }
+.cal-css-section[open] > summary { border-bottom: 1px solid var(--border); }
+.cal-css-input {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  border-radius: 0;
+  padding: 8px 10px;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cal-css-input:focus { outline: none; }
+.cal-css-hint {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.cal-css-hint ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+.cal-css-hint li {
+  margin: 2px 0;
+}
+.cal-css-hint code {
+  background: var(--bg-elev);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--accent);
+}
 
 /* ===== Toast ===== */
 .toast {
