@@ -608,6 +608,26 @@ body.debug-text .highlight-rect {
   color: var(--accent);
 }
 
+/* Highlight width section inside calibration overlay */
+.cal-width-section {
+  margin-top: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-width-section > summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  user-select: none;
+}
+.cal-width-section > summary:hover { color: var(--accent); }
+.cal-width-section[open] > summary { border-bottom: 1px solid var(--border); }
+.cal-width-body { padding: 8px 10px; }
+
 /* ===== Toast ===== */
 .toast {
   position: fixed;

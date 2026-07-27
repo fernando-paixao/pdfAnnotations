@@ -315,3 +315,64 @@ This will be used as factor to next selections.
 
 Or if you have a suggestion about use maybe a param of blank spacing between characters.
 ---
+The `scaleX` factor is **not defined anywhere in your project code** — it's calculated and applied internally by **PDF.js** inside the `renderTextLayer()` function, which lives in the minified library files:
+
+- [`lib/pdf.min.js`](lib/pdf.min.js:22) — contains `pdfjsLib.renderTextLayer()`
+- [`lib/pdf.worker.min.js`](lib/pdf.worker.min.js:22) — the worker that parses text content
+
+**How it works:**
+
+1. PDF.js creates a `<span>` for each text item from the PDF
+2. It sets `font-size`, `left`, `top` from the PDF text item coordinates
+3. The browser renders the span at its natural width
+4. PDF.js measures that rendered width
+5. It compares against the PDF's target width (from `item.width`)
+6. It applies `scaleX = targetWidth / renderedWidth` as an **inline style**:
+
+```html
+<span style="left: 123px; top: 45px; font-size: 12px; font-family: sans-serif; transform: scaleX(0.95);">
+  some text
+</span>
+```
+
+Each span gets its **own unique `scaleX`** because every text fragment can have a different width discrepancy.
+
+**Why you can't easily override it via CSS:** Inline styles have higher specificity than stylesheet rules. To override, you'd need `!important`:
+
+```css
+.textLayer span {
+  transform: scaleX(1) !important;
+}
+```
+
+However, changing `scaleX` globally would break text-to-canvas alignment for all spans, since each one has a unique factor. The `scaleX` is what makes the transparent text layer match the rendered PDF pixels — it's fundamental to how PDF.js works and shouldn't normally be modified.
+
+If you're trying to fix a specific alignment issue between highlights and text, the **calibration sliders** (padLeft/padRight) or **letter-spacing/word-spacing** adjustments in the custom CSS section are better approaches than modifying `scaleX`.
+---
+Task Completed
+09:01 PM
+Added a Font Scale feature that applies a multiplier to every text layer span's font-size while keeping zoom responsiveness via --scale-factor.
+
+How it works:
+
+PDF.js sets each span's inline style as font-size: calc(var(--scale-factor) * 9.51px) (where 9.51 varies per span)
+On first encounter, the code captures each span's original base value into data-base-font (e.g., 9.51)
+It then rewrites the inline style as calc(var(--scale-factor) * <base * multiplier>px)
+This means zoom still works (via --scale-factor), but the base size is scaled by your multiplier
+On page re-render (e.g., zoom change), new spans are created by PDF.js — the code captures their fresh base values and re-applies the multiplier via the onPageRendered callback
+UI:
+The calibration overlay (⚙) now has three collapsible sections:
+
+Custom Text Layer CSS — live CSS injection
+Font Scale — slider (0.50–2.00) with +/− buttons, live preview as you drag
+Highlight Width — left/right padding sliders
+The Font Scale value is persisted per-PDF in localStorage (fontScale_<pdfId>), saved when you click Save, auto-loaded on PDF open. The Reset button resets it back to 1.00 along with the width calibration.
+
+Example: If a span has base font 9.51px and you set the multiplier to 1.1, the span becomes calc(var(--scale-factor) * 10.46px) — at 120% zoom this renders as 12.55px instead of the original 11.41px.
+
+Files modified:
+
+index.html — added Font Scale collapsible <details> section with slider, +/− buttons, value display
+js/app.js — applyFontScaleToPage(), applyFontScaleAll(), updateFontScaleDisplay() functions; hooked into onPageRendered; slider/button event listeners; per-PDF persistence in save/load; reset integration
+js/i18n.js — calibrate.fontScale, calibrate.fontScaleHint, calibrate.multiplier in EN + PT-BR
+---

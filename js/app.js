@@ -67,6 +67,7 @@
   PDFViewer.callbacks.onPageRendered = (pageNumber) => {
     Highlighter.redrawPage(pageNumber);
     Search.redrawPage(pageNumber);
+    applyFontScaleToPage(pageNumber);
   };
   PDFViewer.callbacks.onVisiblePageChange = (n) => {
     currentPage = n;
@@ -112,6 +113,11 @@
   const calLeftVal = $('calLeftVal');
   const calRightVal = $('calRightVal');
 
+  // ---------- Font Scale (text layer font-size multiplier) ----------
+  let fontScaleMultiplier = 1.0;
+  const fontScaleSlider = $('fontScaleSlider');
+  const fontScaleVal = $('fontScaleVal');
+
   function updateCalDisplay() {
     const c = Highlighter.getCalibration();
     calLeftSlider.value = c.padLeft;
@@ -135,6 +141,7 @@
       e.stopPropagation();
       calibrateOverlay.hidden = false;
       updateCalDisplay();
+      updateFontScaleDisplay();
       populateCustomCssFromLive();
     });
   }
@@ -145,6 +152,29 @@
   // Slider live preview
   calLeftSlider.addEventListener('input', applyCalFromSliders);
   calRightSlider.addEventListener('input', applyCalFromSliders);
+
+  // Font scale slider live preview
+  if (fontScaleSlider) {
+    fontScaleSlider.addEventListener('input', () => {
+      fontScaleMultiplier = parseFloat(fontScaleSlider.value) || 1.0;
+      fontScaleVal.textContent = fontScaleMultiplier.toFixed(2);
+      applyFontScaleAll();
+    });
+  }
+  if ($('fontScaleMinus')) {
+    $('fontScaleMinus').addEventListener('click', () => {
+      fontScaleMultiplier = Math.max(0.5, Math.round((fontScaleMultiplier - 0.05) * 100) / 100);
+      updateFontScaleDisplay();
+      applyFontScaleAll();
+    });
+  }
+  if ($('fontScalePlus')) {
+    $('fontScalePlus').addEventListener('click', () => {
+      fontScaleMultiplier = Math.min(2, Math.round((fontScaleMultiplier + 0.05) * 100) / 100);
+      updateFontScaleDisplay();
+      applyFontScaleAll();
+    });
+  }
 
   // +/- buttons (step 0.02 = 2%)
   const STEP = 0.02;
@@ -170,6 +200,9 @@
     calLeftSlider.value = 0;
     calRightSlider.value = 0;
     applyCalFromSliders();
+    fontScaleMultiplier = 1.0;
+    updateFontScaleDisplay();
+    applyFontScaleAll();
   });
 
   // Save (persist to localStorage per PDF)
@@ -177,6 +210,7 @@
     if (currentPdfId) {
       const c = Highlighter.getCalibration();
       localStorage.setItem('calibration_' + currentPdfId, JSON.stringify(c));
+      localStorage.setItem('fontScale_' + currentPdfId, String(fontScaleMultiplier));
       // Also persist custom CSS
       const css = $('debugCustomCss').value.trim();
       if (css) localStorage.setItem('debugCss_' + currentPdfId, css);
@@ -240,6 +274,43 @@
     // Auto-open the details section so the user sees it
     const details = debugCustomCss.closest('details');
     if (details) details.open = true;
+  }
+
+  // ---------- Font Scale functions ----------
+  /** Applies the font-scale multiplier to every span on a single page.
+   *  Stores each span's original base font-size in data-base-font so
+   *  the multiplier can be changed without losing the original value. */
+  function applyFontScaleToPage(pageNumber) {
+    const wrapper = PDFViewer.getPageWrapper(pageNumber);
+    if (!wrapper) return;
+    const spans = wrapper.querySelectorAll('.textLayer span');
+    spans.forEach((span) => {
+      console.log(span);
+      // Capture original base font the first time we see this span
+      if (!span.dataset.baseFont) {
+        const fs = span.style.fontSize || '';
+        const m = fs.match(/([\d.]+)\s*px/);
+        if (m) span.dataset.baseFont = m[1];
+      }
+      if (span.dataset.baseFont) {
+        const base = parseFloat(span.dataset.baseFont);
+        //const scaled = (base * fontScaleMultiplier).toFixed(2);
+        //fernando akiii!!! here!!!
+        //span.style.fontSize = 'calc(var(--scale-factor) * ' + scaled + 'px)';
+        const scaled = (base * PDFViewer.getScale()).toFixed(2);
+        span.style.fontSize = scaled + 'px';
+      }
+    });
+  }
+
+  function applyFontScaleAll() {
+    const n = PDFViewer.getNumPages();
+    for (let i = 1; i <= n; i++) applyFontScaleToPage(i);
+  }
+
+  function updateFontScaleDisplay() {
+    if (fontScaleVal) fontScaleVal.textContent = fontScaleMultiplier.toFixed(2);
+    if (fontScaleSlider) fontScaleSlider.value = fontScaleMultiplier;
   }
 
   AnnotationsUI.init($('annotationList'), $('annotationCount'), searchBox, $('emptyAnnotations'));
@@ -434,6 +505,10 @@
       } else {
         Highlighter.setCalibration({ padLeft: 0, padRight: 0 });
       }
+
+      // Load saved font scale for this PDF (if any)
+      const savedFontScale = localStorage.getItem('fontScale_' + pdfId);
+      fontScaleMultiplier = savedFontScale ? (parseFloat(savedFontScale) || 1.0) : 1.0;
 
       // Load saved custom debug CSS for this PDF (if any)
       const savedCss = localStorage.getItem('debugCss_' + pdfId);
