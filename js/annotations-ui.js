@@ -27,8 +27,16 @@ const AnnotationsUI = (() => {
   }
 
   function render(annotations) {
-    allAnnotations = annotations.slice().sort((a, b) =>
-      a.page - b.page || a.createdAt - b.createdAt);
+    allAnnotations = annotations.slice().sort((a, b) => {
+      if (a.page !== b.page) return a.page - b.page;
+      // Same page: sort by text position (character offset in page text)
+      if (a.textStart != null && b.textStart != null) return a.textStart - b.textStart;
+      // Fallback for legacy annotations without textStart: use vertical position
+      const ay = a.rects && a.rects[0] ? a.rects[0].y : 0;
+      const by = b.rects && b.rects[0] ? b.rects[0].y : 0;
+      if (ay !== by) return ay - by;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
     countEl.textContent = allAnnotations.length;
     searchEl.hidden = allAnnotations.length === 0;
     renderList();
