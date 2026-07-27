@@ -103,7 +103,6 @@
       <span class="editor-expand-label" data-i18n="editor.adjustSelection">Adjust selection</span>
       <button id="editorExpandLeft" class="expand-btn" data-i18n-title="editor.expandLeft" title="Expand left (one word)">◀</button>
       <button id="editorExpandRight" class="expand-btn" data-i18n-title="editor.expandRight" title="Expand right (one word)">▶</button>
-      <button id="calibrateBtn" class="expand-btn" data-i18n-title="calibrate.button" title="Calibrate highlight width">⚙</button>
     </div>
     <textarea id="editorText" data-i18n-placeholder="editor.notePlaceholder" placeholder="Add a note (optional)…"></textarea>
     <div class="editor-actions">
@@ -112,76 +111,6 @@
     </div>
   </div>
 
-  <!-- Calibration overlay (adjusts highlight width + custom CSS for all annotations) -->
-  <div id="calibrateOverlay" class="calibrate-overlay" hidden>
-    <div class="calibrate-panel">
-      <div class="calibrate-header">
-        <h3 data-i18n="calibrate.title">Calibrate</h3>
-        <button id="calClose" class="cal-close" data-i18n-title="calibrate.close" title="Close">✕</button>
-      </div>
-
-      <!-- Custom CSS for text layer (debug) -->
-      <details class="cal-css-section">
-        <summary data-i18n="debug.customCss">Custom Text Layer CSS</summary>
-        <textarea id="debugCustomCss" rows="6" class="cal-css-input"
-          data-i18n-placeholder="debug.customCssPlaceholder"
-          placeholder=".textLayer span {&#10;  /* font-family: serif; */&#10;  /* font-size: 14px; */&#10;  /* letter-spacing: 0.5px; */&#10;  /* word-spacing: 2px; */&#10;}"></textarea>
-        <div class="cal-css-hint">
-          <strong data-i18n="debug.cssHintTitle">Useful CSS properties:</strong>
-          <ul>
-            <li><code>font-family</code> — <span data-i18n="debug.cssFontFamily">match the PDF's font (e.g. serif, sans-serif, Arial)</span></li>
-            <li><code>font-size</code> — <span data-i18n="debug.cssFontSize">adjust text size in px to match rendering</span></li>
-            <li><code>letter-spacing</code> — <span data-i18n="debug.cssLetterSpacing">space between characters (e.g. 0.5px, -0.3px)</span></li>
-            <li><code>word-spacing</code> — <span data-i18n="debug.cssWordSpacing">space between words (e.g. 2px)</span></li>
-            <li><code>line-height</code> — <span data-i18n="debug.cssLineHeight">vertical spacing between lines</span></li>
-            <li><code>transform: scale()</code> — <span data-i18n="debug.cssTransform">scale text to match width</span></li>
-          </ul>
-        </div>
-      </details>
-
-      <!-- Font scale adjustment -->
-      <details class="cal-width-section">
-        <summary data-i18n="calibrate.fontScale">Font Scale</summary>
-        <div class="cal-width-body">
-          <p class="calibrate-hint" data-i18n="calibrate.fontScaleHint">Multiplier for text layer font-size. Keeps zoom via --scale-factor.</p>
-          <div class="calibrate-row">
-            <label data-i18n="calibrate.multiplier">Scale</label>
-            <button class="cal-btn" id="fontScaleMinus">−</button>
-            <input type="range" id="fontScaleSlider" min="0.5" max="2" step="0.01" value="1">
-            <button class="cal-btn" id="fontScalePlus">+</button>
-            <span id="fontScaleVal" class="cal-val">1.00</span>
-          </div>
-        </div>
-      </details>
-
-      <!-- Highlight width adjustment -->
-      <details class="cal-width-section" open>
-        <summary data-i18n="calibrate.widthSection">Highlight Width</summary>
-        <div class="cal-width-body">
-          <p class="calibrate-hint" data-i18n="calibrate.hint">Adjust until highlights cover the text properly. Applies to all annotations.</p>
-          <div class="calibrate-row">
-            <label data-i18n="calibrate.left">Left</label>
-            <button class="cal-btn" id="calLeftMinus">−</button>
-            <input type="range" id="calLeft" min="-0.5" max="0.5" step="0.01" value="0">
-            <button class="cal-btn" id="calLeftPlus">+</button>
-            <span id="calLeftVal" class="cal-val">0</span>
-          </div>
-          <div class="calibrate-row">
-            <label data-i18n="calibrate.right">Right</label>
-            <button class="cal-btn" id="calRightMinus">−</button>
-            <input type="range" id="calRight" min="-0.5" max="0.5" step="0.01" value="0">
-            <button class="cal-btn" id="calRightPlus">+</button>
-            <span id="calRightVal" class="cal-val">0</span>
-          </div>
-        </div>
-      </details>
-
-      <div class="calibrate-actions">
-        <button id="calReset" data-i18n="calibrate.reset">Reset</button>
-        <button id="calSave" class="primary" data-i18n="calibrate.save">Save</button>
-      </div>
-    </div>
-  </div>
   <div id="aiBackdrop" class="ai-backdrop"></div>
   <aside id="aiPanel" class="ai-panel">
     <div class="ai-panel-header">

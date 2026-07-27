@@ -376,3 +376,10 @@ index.html — added Font Scale collapsible <details> section with slider, +/−
 js/app.js — applyFontScaleToPage(), applyFontScaleAll(), updateFontScaleDisplay() functions; hooked into onPageRendered; slider/button event listeners; per-PDF persistence in save/load; reset integration
 js/i18n.js — calibrate.fontScale, calibrate.fontScaleHint, calibrate.multiplier in EN + PT-BR
 ---
+I have solved the problem with:
+
+const scaled = (base * PDFViewer.getScale()).toFixed(2);
+        span.style.fontSize = scaled + 'px';
+
+Can you remove the features of calibrate (customCSS, font scale, highlight width), this is not needed anymore
+---

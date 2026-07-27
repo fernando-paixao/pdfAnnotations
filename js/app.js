@@ -105,187 +105,15 @@
     AnnotationsUI.scrollToAnnotation(id);
   };
 
-  // ---------- Calibration (highlight width adjustment) ----------
-  const calibrateOverlay = $('calibrateOverlay');
-  const calBtn = $('calibrateBtn');
-  const calLeftSlider = $('calLeft');
-  const calRightSlider = $('calRight');
-  const calLeftVal = $('calLeftVal');
-  const calRightVal = $('calRightVal');
-
-  // ---------- Font Scale (text layer font-size multiplier) ----------
-  let fontScaleMultiplier = 1.0;
-  const fontScaleSlider = $('fontScaleSlider');
-  const fontScaleVal = $('fontScaleVal');
-
-  function updateCalDisplay() {
-    const c = Highlighter.getCalibration();
-    calLeftSlider.value = c.padLeft;
-    calRightSlider.value = c.padRight;
-    calLeftVal.textContent = (c.padLeft * 100).toFixed(0) + '%';
-    calRightVal.textContent = (c.padRight * 100).toFixed(0) + '%';
-  }
-
-  function applyCalFromSliders() {
-    Highlighter.setCalibration({
-      padLeft: parseFloat(calLeftSlider.value) || 0,
-      padRight: parseFloat(calRightSlider.value) || 0,
-    });
-    calLeftVal.textContent = (parseFloat(calLeftSlider.value) * 100).toFixed(0) + '%';
-    calRightVal.textContent = (parseFloat(calRightSlider.value) * 100).toFixed(0) + '%';
-  }
-
-  // Open calibration overlay
-  if (calBtn) {
-    calBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      calibrateOverlay.hidden = false;
-      updateCalDisplay();
-      updateFontScaleDisplay();
-      populateCustomCssFromLive();
-    });
-  }
-
-  // Close button
-  $('calClose').addEventListener('click', () => { calibrateOverlay.hidden = true; });
-
-  // Slider live preview
-  calLeftSlider.addEventListener('input', applyCalFromSliders);
-  calRightSlider.addEventListener('input', applyCalFromSliders);
-
-  // Font scale slider live preview
-  if (fontScaleSlider) {
-    fontScaleSlider.addEventListener('input', () => {
-      fontScaleMultiplier = parseFloat(fontScaleSlider.value) || 1.0;
-      fontScaleVal.textContent = fontScaleMultiplier.toFixed(2);
-      applyFontScaleAll();
-    });
-  }
-  if ($('fontScaleMinus')) {
-    $('fontScaleMinus').addEventListener('click', () => {
-      fontScaleMultiplier = Math.max(0.5, Math.round((fontScaleMultiplier - 0.05) * 100) / 100);
-      updateFontScaleDisplay();
-      applyFontScaleAll();
-    });
-  }
-  if ($('fontScalePlus')) {
-    $('fontScalePlus').addEventListener('click', () => {
-      fontScaleMultiplier = Math.min(2, Math.round((fontScaleMultiplier + 0.05) * 100) / 100);
-      updateFontScaleDisplay();
-      applyFontScaleAll();
-    });
-  }
-
-  // +/- buttons (step 0.02 = 2%)
-  const STEP = 0.02;
-  $('calLeftMinus').addEventListener('click', () => {
-    calLeftSlider.value = Math.max(-0.5, parseFloat(calLeftSlider.value) - STEP);
-    applyCalFromSliders();
-  });
-  $('calLeftPlus').addEventListener('click', () => {
-    calLeftSlider.value = Math.min(0.5, parseFloat(calLeftSlider.value) + STEP);
-    applyCalFromSliders();
-  });
-  $('calRightMinus').addEventListener('click', () => {
-    calRightSlider.value = Math.max(-0.5, parseFloat(calRightSlider.value) - STEP);
-    applyCalFromSliders();
-  });
-  $('calRightPlus').addEventListener('click', () => {
-    calRightSlider.value = Math.min(0.5, parseFloat(calRightSlider.value) + STEP);
-    applyCalFromSliders();
-  });
-
-  // Reset
-  $('calReset').addEventListener('click', () => {
-    calLeftSlider.value = 0;
-    calRightSlider.value = 0;
-    applyCalFromSliders();
-    fontScaleMultiplier = 1.0;
-    updateFontScaleDisplay();
-    applyFontScaleAll();
-  });
-
-  // Save (persist to localStorage per PDF)
-  $('calSave').addEventListener('click', () => {
-    if (currentPdfId) {
-      const c = Highlighter.getCalibration();
-      localStorage.setItem('calibration_' + currentPdfId, JSON.stringify(c));
-      localStorage.setItem('fontScale_' + currentPdfId, String(fontScaleMultiplier));
-      // Also persist custom CSS
-      const css = $('debugCustomCss').value.trim();
-      if (css) localStorage.setItem('debugCss_' + currentPdfId, css);
-      else localStorage.removeItem('debugCss_' + currentPdfId);
-    }
-    calibrateOverlay.hidden = true;
-    showToast(I18N.t('msg.calibrationSaved'));
-  });
-
-  // ---------- Custom CSS for text layer (debug) ----------
-  const debugCustomCss = $('debugCustomCss');
-  let customStyleEl = null;
-
-  function applyCustomCss() {
-    const css = debugCustomCss.value.trim();
-    if (!css) {
-      if (customStyleEl) { customStyleEl.remove(); customStyleEl = null; }
-      return;
-    }
-    if (!customStyleEl) {
-      customStyleEl = document.createElement('style');
-      customStyleEl.id = 'debugCustomCssStyle';
-      document.head.appendChild(customStyleEl);
-    }
-    customStyleEl.textContent = css;
-  }
-
-  debugCustomCss.addEventListener('input', applyCustomCss);
-
-  /** Reads actual computed styles from the first text-layer span on the current page
-   *  and returns a CSS template the user can tweak. */
-  function computeCurrentTextLayerCss() {
-    const wrapper = PDFViewer.getPageWrapper(currentPage);
-    if (!wrapper) return '';
-    const span = wrapper.querySelector('.textLayer span');
-    if (!span) return '';
-    const cs = getComputedStyle(span);
-    const props = [
-      'font-family',
-      'font-size',
-      'letter-spacing',
-      'word-spacing',
-      'line-height',
-      'transform',
-      'transform-origin',
-    ];
-    const lines = [];
-    for (const p of props) {
-      const v = cs.getPropertyValue(p);
-      if (v) lines.push('  ' + p + ': ' + v + ';');
-    }
-    return '.textLayer span {\n' + lines.join('\n') + '\n}';
-  }
-
-  /** Pre-populate the custom CSS textarea with actual values (only if empty). */
-  function populateCustomCssFromLive() {
-    if (!debugCustomCss || debugCustomCss.value.trim()) return; // don't overwrite
-    const css = computeCurrentTextLayerCss();
-    if (!css) return;
-    debugCustomCss.value = css;
-    // Auto-open the details section so the user sees it
-    const details = debugCustomCss.closest('details');
-    if (details) details.open = true;
-  }
-
-  // ---------- Font Scale functions ----------
-  /** Applies the font-scale multiplier to every span on a single page.
-   *  Stores each span's original base font-size in data-base-font so
-   *  the multiplier can be changed without losing the original value. */
+  // ---------- Text layer font-size fix ----------
+  /** Overrides each text-layer span's font-size to use a fixed px value
+   *  (base * current scale) instead of PDF.js's calc(var(--scale-factor) * Xpx).
+   *  Called from onPageRendered — the only place where the spans already exist. */
   function applyFontScaleToPage(pageNumber) {
     const wrapper = PDFViewer.getPageWrapper(pageNumber);
     if (!wrapper) return;
     const spans = wrapper.querySelectorAll('.textLayer span');
     spans.forEach((span) => {
-      console.log(span);
       // Capture original base font the first time we see this span
       if (!span.dataset.baseFont) {
         const fs = span.style.fontSize || '';
@@ -294,23 +122,10 @@
       }
       if (span.dataset.baseFont) {
         const base = parseFloat(span.dataset.baseFont);
-        //const scaled = (base * fontScaleMultiplier).toFixed(2);
-        //fernando akiii!!! here!!!
-        //span.style.fontSize = 'calc(var(--scale-factor) * ' + scaled + 'px)';
         const scaled = (base * PDFViewer.getScale()).toFixed(2);
         span.style.fontSize = scaled + 'px';
       }
     });
-  }
-
-  function applyFontScaleAll() {
-    const n = PDFViewer.getNumPages();
-    for (let i = 1; i <= n; i++) applyFontScaleToPage(i);
-  }
-
-  function updateFontScaleDisplay() {
-    if (fontScaleVal) fontScaleVal.textContent = fontScaleMultiplier.toFixed(2);
-    if (fontScaleSlider) fontScaleSlider.value = fontScaleMultiplier;
   }
 
   AnnotationsUI.init($('annotationList'), $('annotationCount'), searchBox, $('emptyAnnotations'));
@@ -497,28 +312,6 @@
       // 1) Stable PDF id
       const pdfId = await Storage.hashFile(file);
       currentPdfId = pdfId;
-
-      // Load saved calibration for this PDF (if any)
-      const savedCal = localStorage.getItem('calibration_' + pdfId);
-      if (savedCal) {
-        try { Highlighter.setCalibration(JSON.parse(savedCal)); } catch (_) {}
-      } else {
-        Highlighter.setCalibration({ padLeft: 0, padRight: 0 });
-      }
-
-      // Load saved font scale for this PDF (if any)
-      const savedFontScale = localStorage.getItem('fontScale_' + pdfId);
-      fontScaleMultiplier = savedFontScale ? (parseFloat(savedFontScale) || 1.0) : 1.0;
-
-      // Load saved custom debug CSS for this PDF (if any)
-      const savedCss = localStorage.getItem('debugCss_' + pdfId);
-      if (savedCss && debugCustomCss) {
-        debugCustomCss.value = savedCss;
-        applyCustomCss();
-      } else if (debugCustomCss) {
-        debugCustomCss.value = '';
-        applyCustomCss();
-      }
 
       // 2) Migrate old annotations (v1 format with pdfId but no namespaceId)
       const migratedNs = await Storage.migrateOldAnnotations(pdfId, file.name);
