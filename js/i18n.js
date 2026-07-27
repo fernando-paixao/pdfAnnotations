@@ -51,6 +51,8 @@ const I18N = (() => {
       'editor.adjustSelection': 'Adjust selection',
       'editor.expandLeft': 'Expand left (one word)',
       'editor.expandRight': 'Expand right (one word)',
+      'editor.shrinkLeft': 'Shrink left (one word)',
+      'editor.shrinkRight': 'Shrink right (one word)',
 
       // AI Panel
       'ai.assistant': 'AI Assistant',
@@ -266,6 +268,8 @@ const I18N = (() => {
       'editor.adjustSelection': 'Ajustar seleção',
       'editor.expandLeft': 'Expandir à esquerda (uma palavra)',
       'editor.expandRight': 'Expandir à direita (uma palavra)',
+      'editor.shrinkLeft': 'Reduzir à esquerda (uma palavra)',
+      'editor.shrinkRight': 'Reduzir à direita (uma palavra)',
 
       // AI Panel
       'ai.assistant': 'Assistente IA',

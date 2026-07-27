@@ -12,6 +12,8 @@ const Highlighter = (() => {
   let editorDelete = null;
   let editorExpandLeft = null;
   let editorExpandRight = null;
+  let editorShrinkLeft = null;
+  let editorShrinkRight = null;
   let viewerEl = null;
 
   // page -> Map(annotationId -> annotation)
@@ -38,6 +40,8 @@ const Highlighter = (() => {
     editorDelete = popover.querySelector('#editorDelete');
     editorExpandLeft = popover.querySelector('#editorExpandLeft');
     editorExpandRight = popover.querySelector('#editorExpandRight');
+    editorShrinkLeft = popover.querySelector('#editorShrinkLeft');
+    editorShrinkRight = popover.querySelector('#editorShrinkRight');
 
     // Show highlight button on text selection
     document.addEventListener('mouseup', () => setTimeout(updateSelectionButton, 10));
@@ -51,8 +55,10 @@ const Highlighter = (() => {
 
     editorSave.addEventListener('click', onEditorSave);
     editorDelete.addEventListener('click', onEditorDelete);
-    editorExpandLeft.addEventListener('click', () => onExpandSelection('left'));
-    editorExpandRight.addEventListener('click', () => onExpandSelection('right'));
+    editorExpandLeft.addEventListener('click', () => onAdjustSelection('expand', 'left'));
+    editorExpandRight.addEventListener('click', () => onAdjustSelection('expand', 'right'));
+    editorShrinkLeft.addEventListener('click', () => onAdjustSelection('shrink', 'left'));
+    editorShrinkRight.addEventListener('click', () => onAdjustSelection('shrink', 'right'));
 
     // Close popover when clicking outside
     document.addEventListener('mousedown', (e) => {
@@ -163,6 +169,24 @@ const Highlighter = (() => {
     if (rects.length === 0) { highlightBtn.hidden = true; return; }
 
     const textSelected = sel.toString().trim();
+
+    // Compute character offsets in the page's full-text index.
+    // This lets expand-selection locate the EXACT occurrence later,
+    // instead of always finding the first match.
+    let textStart = null, textEnd = null;
+    try {
+      const tc = await PDFViewer.getTextContent(page);
+      if (tc) {
+        const textIdx = TextGeometry.buildIndex(tc);
+        const spanMap = PDFViewer.getSpanMap(page);
+        const charRange = TextGeometry.selectionToCharRange(textIdx, spanMap, range);
+        if (charRange) {
+          textStart = charRange.start;
+          textEnd = charRange.end;
+        }
+      }
+    } catch (e) { /* non-critical — expand will fall back to findSnippetRange */ }
+
     sel.removeAllRanges();
     highlightBtn.hidden = true;
 
@@ -173,6 +197,8 @@ const Highlighter = (() => {
       rects,
       annotationText: null,
       color: HIGHLIGHT_COLOR,
+      textStart,
+      textEnd,
     };
 
     if (callbacks.createAnnotation) {
@@ -321,8 +347,8 @@ const Highlighter = (() => {
     if (callbacks.annotationChanged) callbacks.annotationChanged();
   }
 
-  /* ---------- Expand selection by one word ---------- */
-  async function onExpandSelection(direction) {
+  /* ---------- Adjust selection (expand or shrink by one word) ---------- */
+  async function onAdjustSelection(action, direction) {
     if (activeAnnotationId == null) return;
     const ann = byId.get(activeAnnotationId);
     if (!ann) return;
@@ -332,37 +358,67 @@ const Highlighter = (() => {
     if (!tc) return;
     const idx = TextGeometry.buildIndex(tc);
 
-    // Find the annotation's current text in the page
     const snippet = ann.textSelected || '';
     if (!snippet.trim()) return;
-    const range = TextGeometry.findSnippetRange(idx, snippet);
-    if (!range) return;
 
-    // Expand by one word
-    let newStart = range.start;
-    let newEnd = range.end;
-    if (direction === 'left') {
-      // Move start left: skip whitespace, then include the previous word
-      let s = newStart;
-      while (s > 0 && /\s/.test(idx.full[s - 1])) s--;
-      while (s > 0 && !/\s/.test(idx.full[s - 1])) s--;
-      if (s < newStart) newStart = s;
+    // Use stored char offsets when available (pinpoints the exact occurrence).
+    // Fall back to findSnippetRange for legacy annotations without offsets.
+    let start, end;
+    if (ann.textStart != null && ann.textEnd != null) {
+      start = ann.textStart;
+      end = ann.textEnd;
     } else {
-      // Move end right: skip whitespace, then include the next word
-      let e = newEnd;
-      while (e < idx.full.length && /\s/.test(idx.full[e])) e++;
-      while (e < idx.full.length && !/\s/.test(idx.full[e])) e++;
-      if (e > newEnd) newEnd = e;
+      const range = TextGeometry.findSnippetRange(idx, snippet);
+      if (!range) return;
+      start = range.start;
+      end = range.end;
     }
 
-    // Nothing changed (already at boundary)
-    if (newStart === range.start && newEnd === range.end) return;
+    let newStart = start;
+    let newEnd = end;
+
+    if (action === 'expand') {
+      if (direction === 'left') {
+        // Move start left: skip whitespace, then include the previous word
+        let s = newStart;
+        while (s > 0 && /\s/.test(idx.full[s - 1])) s--;
+        while (s > 0 && !/\s/.test(idx.full[s - 1])) s--;
+        if (s < newStart) newStart = s;
+      } else {
+        // Move end right: skip whitespace, then include the next word
+        let e = newEnd;
+        while (e < idx.full.length && /\s/.test(idx.full[e])) e++;
+        while (e < idx.full.length && !/\s/.test(idx.full[e])) e++;
+        if (e > newEnd) newEnd = e;
+      }
+    } else { // shrink
+      if (direction === 'left') {
+        // Move start right: remove the first word of the current selection
+        let s = newStart;
+        while (s < newEnd && /\s/.test(idx.full[s])) s++;       // skip leading whitespace
+        while (s < newEnd && !/\s/.test(idx.full[s])) s++;      // skip the word
+        while (s < newEnd && /\s/.test(idx.full[s])) s++;       // skip trailing whitespace
+        // Only apply if at least one word remains
+        if (s > newStart && s < newEnd) newStart = s;
+      } else {
+        // Move end left: remove the last word of the current selection
+        let e = newEnd;
+        while (e > newStart && /\s/.test(idx.full[e - 1])) e--; // skip trailing whitespace
+        while (e > newStart && !/\s/.test(idx.full[e - 1])) e--; // skip the word
+        while (e > newStart && /\s/.test(idx.full[e - 1])) e--; // skip leading whitespace
+        // Only apply if at least one word remains
+        if (e < newEnd && e > newStart) newEnd = e;
+      }
+    }
+
+    // Nothing changed (already at boundary or can't shrink further)
+    if (newStart === start && newEnd === end) return;
 
     // Extract the new text
     const newText = idx.full.slice(newStart, newEnd).trim();
     if (!newText || newText === ann.textSelected) return;
 
-    // Recalculate rects for the expanded range
+    // Recalculate rects for the adjusted range
     const baseVp = PDFViewer.getBaseViewport(ann.page);
     if (!baseVp) return;
     const vp = baseVp.clone({ scale: PDFViewer.getScale() });
@@ -370,9 +426,11 @@ const Highlighter = (() => {
     const newRects = TextGeometry.rangeToRects(idx, newStart, newEnd, vp, spanMap);
     if (!newRects.length) return;
 
-    // Update annotation
+    // Update annotation (including stored offsets for next adjust)
     ann.textSelected = newText;
     ann.rects = newRects;
+    ann.textStart = newStart;
+    ann.textEnd = newEnd;
     ann.updatedAt = Date.now();
 
     // Persist and redraw

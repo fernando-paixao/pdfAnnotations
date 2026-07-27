@@ -383,3 +383,43 @@ const scaled = (base * PDFViewer.getScale()).toFixed(2);
 
 Can you remove the features of calibrate (customCSS, font scale, highlight width), this is not needed anymore
 ---
+Task Completed
+12:16 AM
+
+Fixed the expand-selection feature to track the exact position of annotation text on the page, instead of always finding the first occurrence.
+
+Problem
+onExpandSelection() called findSnippetRange() which searches for the first occurrence of the annotation's textSelected string in the page text. When the same text appears multiple times on a page, it always found the first one — expanding/updating the wrong occurrence.
+
+Solution
+Store character offsets (textStart/textEnd) in the annotation data when it's created, then use those stored offsets during expand instead of searching.
+
+Changes made across 4 files:
+1. js/text-geometry.js — Added selectionToCharRange() function
+
+Takes the text index, spanMap, and DOM selection range
+Uses domRange.intersectsNode() to find which text-layer spans are selected
+Maps their item indices to character offsets in idx.full
+Returns {start, end} pinpointing the exact occurrence
+2. js/highlighter.js — onHighlightClick() (manual annotations)
+
+After getting the selection text, computes textStart/textEnd via selectionToCharRange()
+Stores them in the annotation data before persistence
+Wrapped in try/catch — non-critical, falls back gracefully
+**3. js/highlighter.js] — onExpandSelection()
+
+Uses stored ann.textStart/ann.textEnd directly when available (no text search needed)
+Falls back to findSnippetRange() for legacy annotations without offsets
+Updates stored offsets (ann.textStart/ann.textEnd) after each expand
+4. js/auto-annotate.js — AI-created annotations
+
+Added textStart: range.start, textEnd: range.end to annotation data (the range was already computed by findSnippetRange at line 211)
+5. js/app.js — Import handler
+
+Preserves textStart/textEnd when importing annotations from JSON
+Backward compatibility
+Existing annotations without offsets fall back to findSnippetRange() (current behavior)
+After the first expand of a legacy annotation, offsets get stored — subsequent expands use them
+No IndexedDB schema changes needed (entire annotation object is persisted via put/add)
+Export automatically includes the new fields (serializes full annotation objects)
+---

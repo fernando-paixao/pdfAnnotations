@@ -227,6 +227,47 @@ const TextGeometry = (() => {
   }
 
   /**
+   * Given a DOM selection range and the page's span map + index,
+   * compute the character offsets [start, end) in idx.full that
+   * correspond to the selected text-layer spans.
+   *
+   * This is used to store precise character positions on annotations
+   * so that expand-selection can operate on the correct occurrence
+   * instead of always finding the first match.
+   *
+   * @param {Object} idx      - result of buildIndex()
+   * @param {Map|null} spanMap - Map<itemIdx, HTMLSpanElement> from PDF.js text layer
+   * @param {Range} domRange   - DOM Range from window.getSelection().getRangeAt(0)
+   * @returns {{start:number, end:number}|null} char offsets in idx.full
+   */
+  function selectionToCharRange(idx, spanMap, domRange) {
+    if (!spanMap || !domRange) return null;
+    // Find the first and last text-item indices whose spans intersect the selection
+    let firstItemIdx = Infinity;
+    let lastItemIdx = -1;
+    spanMap.forEach((span, itemIdx) => {
+      try {
+        if (domRange.intersectsNode(span)) {
+          if (itemIdx < firstItemIdx) firstItemIdx = itemIdx;
+          if (itemIdx > lastItemIdx) lastItemIdx = itemIdx;
+        }
+      } catch (e) { /* skip problematic nodes */ }
+    });
+    if (firstItemIdx === Infinity) return null;
+    // Map item indices to character offsets in idx.full via charMap
+    let start = -1;
+    let end = -1;
+    for (let i = 0; i < idx.charMap.length; i++) {
+      const cm = idx.charMap[i];
+      if (!cm || cm.itemIdx < 0) continue;
+      if (cm.itemIdx === firstItemIdx && start === -1) start = i;
+      if (cm.itemIdx === lastItemIdx) end = i + 1;
+    }
+    if (start === -1 || end === -1) return null;
+    return { start, end };
+  }
+
+  /**
    * Find the best char range in `idx.full` that matches `snippet`.
    * Strategy:
    *   1. Exact substring match (normalized).
@@ -460,5 +501,5 @@ const TextGeometry = (() => {
     return best; // may be null
   }
 
-  return { buildIndex, rangeToRects, findSnippetRange, normalize, stripPunctuation };
+  return { buildIndex, rangeToRects, findSnippetRange, selectionToCharRange, normalize, stripPunctuation };
 })();

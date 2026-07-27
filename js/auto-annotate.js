@@ -244,6 +244,8 @@ const AutoAnnotate = (() => {
               rects,
               annotationText: opts.includeNotes && p.note ? p.note.trim() : null,
               color: '#30a46c', // green tint to distinguish AI annotations
+              textStart: range.start,
+              textEnd: range.end,
             };
             if (callbacks.createAnnotation) {
               const ann = await callbacks.createAnnotation(data);

@@ -452,6 +452,8 @@
           rects: a.rects,
           annotationText: a.annotationText || null,
           color: a.color || '#ffd400',
+          textStart: a.textStart != null ? a.textStart : null,
+          textEnd: a.textEnd != null ? a.textEnd : null,
           createdAt: a.createdAt || Date.now(),
           updatedAt: Date.now(),
         };
