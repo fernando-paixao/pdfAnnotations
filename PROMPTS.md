@@ -423,3 +423,12 @@ After the first expand of a legacy annotation, offsets get stored — subsequent
 No IndexedDB schema changes needed (entire annotation object is persisted via put/add)
 Export automatically includes the new fields (serializes full annotation objects)
 ---
+Great!
+Now can you add, as you haved added the copy to clipboard feature, two buttons to search the annotation selection text on Google in a new window and other to find images on Google
+---
+And can you add a button to call Google Translate
+---
+Awesome!
+Now you can add a button in the place where I have the "Debug text layer" (.debug-btn) and open a modal with configurations? There can be:
+- the "Debug text layer" button
+- A parametrization to google image search button look only the images free from copywright laws?

@@ -125,6 +125,30 @@ const AnnotationsUI = (() => {
       });
       actions.appendChild(copy);
 
+      // Google Search button
+      const googleSearch = document.createElement('button');
+      googleSearch.className = 'copy-btn';
+      googleSearch.title = I18N.t('panel.googleSearch');
+      googleSearch.textContent = '🔍';
+      googleSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const q = encodeURIComponent(ann.textSelected || '');
+        window.open('https://www.google.com/search?q=' + q, '_blank', 'noopener');
+      });
+      actions.appendChild(googleSearch);
+
+      // Google Images button
+      const googleImages = document.createElement('button');
+      googleImages.className = 'copy-btn';
+      googleImages.title = I18N.t('panel.googleImages');
+      googleImages.textContent = '🖼️';
+      googleImages.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const q = encodeURIComponent(ann.textSelected || '');
+        window.open('https://www.google.com/search?tbm=isch&q=' + q, '_blank', 'noopener');
+      });
+      actions.appendChild(googleImages);
+
       const del = document.createElement('button');
       del.className = 'danger';
       del.textContent = I18N.t('editor.delete');

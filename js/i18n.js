@@ -36,6 +36,8 @@ const I18N = (() => {
       'panel.emptyHighlight': 'Highlight',
       'panel.noMatches': 'No matches.',
       'panel.copyText': 'Copy text',
+      'panel.googleSearch': 'Search on Google',
+      'panel.googleImages': 'Search images on Google',
 
       // Namespace
       'ns.selectTitle': 'Select namespace',
@@ -253,6 +255,8 @@ const I18N = (() => {
       'panel.emptyHighlight': 'Destacar',
       'panel.noMatches': 'Nenhuma correspondência.',
       'panel.copyText': 'Copiar texto',
+      'panel.googleSearch': 'Pesquisar no Google',
+      'panel.googleImages': 'Pesquisar imagens no Google',
 
       // Namespace
       'ns.selectTitle': 'Selecionar namespace',
