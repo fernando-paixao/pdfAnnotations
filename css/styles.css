@@ -134,6 +134,76 @@ button.danger:hover { background: var(--danger); color: #fff; }
 .debug-btn:hover { background: var(--accent); border-color: var(--accent); }
 .debug-btn.active { background: var(--danger); border-color: var(--danger); }
 
+/* ===== Settings modal ===== */
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-modal[hidden] { display: none; }
+.settings-modal-content {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  width: 380px;
+  max-width: 90vw;
+}
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-modal-header h2 { margin: 0; font-size: 16px; }
+.settings-close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.settings-close:hover { color: var(--text); background: var(--bg-elev); }
+.settings-modal-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.settings-check input { width: auto; cursor: pointer; }
+.settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+.settings-label input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.settings-label input:focus { outline: none; border-color: var(--accent); }
+
 /* ===== Main layout ===== */
 #main {
   display: flex;

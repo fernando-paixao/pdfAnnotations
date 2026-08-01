@@ -426,7 +426,9 @@ Export automatically includes the new fields (serializes full annotation objects
 Great!
 Now can you add, as you haved added the copy to clipboard feature, two buttons to search the annotation selection text on Google in a new window and other to find images on Google
 ---
-And can you add a button to call Google Translate
+And now can you add a button to open in a new window the Google Translate page with the annotation selection text as subject of the translation?
+
+Use the recent configurations button to add there the default translation target language as input text showing in placeholder some example (default empty, don't let the param to Google Translate search)
 ---
 Awesome!
 Now you can add a button in the place where I have the "Debug text layer" (.debug-btn) and open a modal with configurations? There can be:

@@ -145,9 +145,25 @@ const AnnotationsUI = (() => {
       googleImages.addEventListener('click', (e) => {
         e.stopPropagation();
         const q = encodeURIComponent(ann.textSelected || '');
-        window.open('https://www.google.com/search?tbm=isch&q=' + q, '_blank', 'noopener');
+        const cc = (typeof window.getCcImagesEnabled === 'function' && window.getCcImagesEnabled())
+          ? '&tbs=sur:fmc' : ''; // sur:fmc = free to use, share, or modify commercially
+        window.open('https://www.google.com/search?tbm=isch' + cc + '&q=' + q, '_blank', 'noopener');
       });
       actions.appendChild(googleImages);
+
+      // Google Translate button
+      const googleTranslate = document.createElement('button');
+      googleTranslate.className = 'copy-btn';
+      googleTranslate.title = I18N.t('panel.googleTranslate');
+      googleTranslate.textContent = '🌐';
+      googleTranslate.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const q = encodeURIComponent(ann.textSelected || '');
+        const tl = (typeof window.getTranslateLang === 'function' && window.getTranslateLang())
+          ? '&tl=' + encodeURIComponent(window.getTranslateLang()) : '';
+        window.open('https://translate.google.com/?sl=auto&op=translate' + tl + '&text=' + q, '_blank', 'noopener');
+      });
+      actions.appendChild(googleTranslate);
 
       const del = document.createElement('button');
       del.className = 'danger';

@@ -36,7 +36,12 @@
   const nsRenameBtn = $('nsRename');
   const nsDeleteBtn = $('nsDelete');
   const langSelect = $('langSelect');
-  const debugTextBtn = $('debugTextBtn');
+  const settingsBtn = $('settingsBtn');
+  const settingsModal = $('settingsModal');
+  const settingsClose = $('settingsClose');
+  const debugTextToggle = $('debugTextToggle');
+  const ccImagesToggle = $('ccImagesToggle');
+  const translateLangInput = $('translateLangInput');
 
   // ---------- Helpers ----------
   function uuid() {
@@ -352,7 +357,7 @@
       searchGroup.hidden = false;
       namespaceBar.hidden = false;
       searchBox.hidden = false;
-      debugTextBtn.hidden = false;
+      settingsBtn.hidden = false;
       zoomLevel.textContent = Math.round(PDFViewer.getScale() * 100) + '%';
       await Storage.savePdfMeta({
         pdfId, fileName: file.name, numPages: PDFViewer.getNumPages(), lastOpened: Date.now(),
@@ -395,12 +400,48 @@
   $('zoomIn').addEventListener('click', () => PDFViewer.zoomIn());
   $('zoomOut').addEventListener('click', () => PDFViewer.zoomOut());
 
-  // ---------- Debug: toggle text layer visibility ----------
-  debugTextBtn.addEventListener('click', () => {
-    const isActive = document.body.classList.toggle('debug-text');
-    debugTextBtn.classList.toggle('active', isActive);
-    // Redraw annotations so tooltips show/hide rect coordinates
+  // ---------- Settings modal ----------
+  // CC images setting: persisted in localStorage, exposed globally
+  window.getCcImagesEnabled = function () {
+    return localStorage.getItem('ccImagesEnabled') === '1';
+  };
+
+  // Google Translate target language: persisted in localStorage, exposed globally
+  window.getTranslateLang = function () {
+    return (localStorage.getItem('translateLang') || '').trim();
+  };
+
+  // Restore saved settings on load
+  ccImagesToggle.checked = window.getCcImagesEnabled();
+  translateLangInput.value = window.getTranslateLang();
+
+  settingsBtn.addEventListener('click', () => {
+    settingsModal.hidden = false;
+  });
+  settingsClose.addEventListener('click', () => {
+    settingsModal.hidden = true;
+  });
+  // Close modal when clicking the backdrop
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) settingsModal.hidden = true;
+  });
+
+  // Debug text layer toggle
+  debugTextToggle.addEventListener('change', () => {
+    const isActive = debugTextToggle.checked;
+    document.body.classList.toggle('debug-text', isActive);
+    settingsBtn.classList.toggle('active', isActive);
     Highlighter.redrawAll();
+  });
+
+  // CC images toggle
+  ccImagesToggle.addEventListener('change', () => {
+    localStorage.setItem('ccImagesEnabled', ccImagesToggle.checked ? '1' : '0');
+  });
+
+  // Google Translate target language
+  translateLangInput.addEventListener('change', () => {
+    localStorage.setItem('translateLang', translateLangInput.value.trim());
   });
 
   // Keyboard shortcuts when viewer focused

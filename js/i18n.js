@@ -20,6 +20,11 @@ const I18N = (() => {
       'toolbar.zoomOut': 'Zoom out',
       'toolbar.zoomIn': 'Zoom in',
       'debug.toggleTextLayer': 'Toggle text layer visibility (debug)',
+      'settings.title': 'Settings',
+      'settings.debugTextLayer': 'Show text layer (debug)',
+      'settings.ccImages': 'Google Images: filter by copyright-free only',
+      'settings.translateLang': 'Google Translate target language (e.g. en, pt, es)',
+      'settings.translateLangPlaceholder': 'en',
       'toolbar.export': 'Export',
       'toolbar.import': 'Import',
       'toolbar.ai': 'AI',
@@ -38,6 +43,7 @@ const I18N = (() => {
       'panel.copyText': 'Copy text',
       'panel.googleSearch': 'Search on Google',
       'panel.googleImages': 'Search images on Google',
+      'panel.googleTranslate': 'Translate on Google Translate',
 
       // Namespace
       'ns.selectTitle': 'Select namespace',
@@ -239,6 +245,11 @@ const I18N = (() => {
       'toolbar.zoomOut': 'Reduzir zoom',
       'toolbar.zoomIn': 'Aumentar zoom',
       'debug.toggleTextLayer': 'Alternar visibilidade da camada de texto (debug)',
+      'settings.title': 'Configurações',
+      'settings.debugTextLayer': 'Mostrar camada de texto (debug)',
+      'settings.ccImages': 'Google Images: filtrar apenas sem direitos autorais',
+      'settings.translateLang': 'Idioma destino do Google Translate (ex. en, pt, es)',
+      'settings.translateLangPlaceholder': 'en',
       'toolbar.export': 'Exportar',
       'toolbar.import': 'Importar',
       'toolbar.ai': 'IA',
@@ -257,6 +268,7 @@ const I18N = (() => {
       'panel.copyText': 'Copiar texto',
       'panel.googleSearch': 'Pesquisar no Google',
       'panel.googleImages': 'Pesquisar imagens no Google',
+      'panel.googleTranslate': 'Traduzir no Google Translate',
 
       // Namespace
       'ns.selectTitle': 'Selecionar namespace',

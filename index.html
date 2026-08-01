@@ -47,7 +47,7 @@
       <button id="zoomIn" data-i18n-title="toolbar.zoomIn" title="Zoom in">+</button>
     </div>
 
-    <button id="debugTextBtn" class="debug-btn" hidden data-i18n-title="debug.toggleTextLayer" title="Toggle text layer visibility (debug)">🐛</button>
+    <button id="settingsBtn" class="debug-btn" hidden data-i18n-title="settings.title" title="Settings">⚙️</button>
 
     <div class="data-group" id="dataGroup" hidden>
       <button id="exportBtn" data-i18n="toolbar.export" data-i18n-title="toolbar.export" title="Export annotations to JSON">Export</button>
@@ -303,6 +303,30 @@
       </details>
     </div>
   </aside>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="settings-modal" hidden>
+    <div class="settings-modal-content">
+      <div class="settings-modal-header">
+        <h2 data-i18n="settings.title">Settings</h2>
+        <button id="settingsClose" class="settings-close">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <label class="settings-check">
+          <input type="checkbox" id="debugTextToggle" />
+          <span data-i18n="settings.debugTextLayer">Show text layer (debug)</span>
+        </label>
+        <label class="settings-check">
+          <input type="checkbox" id="ccImagesToggle" />
+          <span data-i18n="settings.ccImages">Google Images: filter by copyright-free only</span>
+        </label>
+        <label class="settings-label">
+          <span data-i18n="settings.translateLang">Google Translate target language (e.g. en, pt, es)</span>
+          <input type="text" id="translateLangInput" data-i18n-placeholder="settings.translateLangPlaceholder" placeholder="en" maxlength="5" />
+        </label>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast for feedback -->
   <div id="toast" class="toast" hidden></div>
