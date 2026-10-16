@@ -188,6 +188,10 @@
           <label id="aiPageCountWrap" hidden><span data-i18n="ai.pageCount">Number of pages</span>
             <input type="number" id="aiPageCount" value="1" min="1" max="50" />
           </label>
+          <label id="aiHighlightCountWrap" hidden><span data-i18n="ai.highlightCount">Number of highlights ahead</span>
+            <input type="number" id="aiHighlightCount" value="1" min="1" max="500"
+              data-i18n-placeholder="ai.highlightCountPlaceholder" placeholder="leave empty = until the end" />
+          </label>
           <div class="row">
             <button id="aiSend" class="primary" data-i18n="ai.send">Send</button>
             <button id="aiStop" class="danger" hidden data-i18n="ai.stop">Stop</button>

@@ -209,10 +209,12 @@
   };
 
   /**
-   * Build the text span from the anchor highlight up to (not including) the
-   * next highlight, continuing across pages until the next highlight or the
-   * end of the document. Returns { text, pages, label } or null (caller
-   * falls back to the entire-page scope).
+   * Build the text span starting at the anchor highlight (inclusive) up to —
+   * but not including — the boundary highlight. By default the boundary is the
+   * next highlight; "Number of highlights ahead" advances the boundary several
+   * highlights further, and an empty value runs to the end of the document.
+   * Returns { text, pages, label } or null (caller falls back to the
+   * entire-page scope).
    */
   AIPanel.callbacks.getHighlightSpan = async (anchor) => {
     const anchorRange = await resolveAnnotationRange(anchor);
@@ -226,15 +228,35 @@
     }
     candidates.sort((x, y) => (x.page - y.page) || (x.start - y.start));
 
-    // Next highlight = first candidate lexicographically after (anchorPage, anchorEnd)
-    let next = null;
-    for (const c of candidates) {
-      if (c.ann.id === anchor.id) continue;
-      if (c.page > anchorRange.page ||
-          (c.page === anchorRange.page && c.start >= anchorRange.end)) {
-        next = c;
-        break;
+    // How many next-highlight boundaries to advance (empty/invalid = to the end)
+    let maxSteps = null;
+    const rawCount = String(
+      AIPanel.getSettings ? (AIPanel.getSettings().highlightCount || '') : ''
+    ).trim();
+    if (rawCount !== '') {
+      const n = parseInt(rawCount, 10);
+      if (!isNaN(n) && n > 0) maxSteps = n;
+    }
+
+    // Walk highlight → next highlight until the Nth boundary (or the last one)
+    const used = new Set([anchor.id]);
+    let cursor = { page: anchorRange.page, end: anchorRange.end };
+    let boundary = null;
+    let steps = 0;
+    while (maxSteps === null || steps < maxSteps) {
+      let cand = null;
+      for (const c of candidates) {
+        if (used.has(c.ann.id)) continue;
+        if (c.page > cursor.page || (c.page === cursor.page && c.start >= cursor.end)) {
+          cand = c;
+          break;
+        }
       }
+      if (!cand) break;
+      boundary = cand;
+      used.add(cand.ann.id);
+      cursor = { page: cand.page, end: cand.end };
+      steps++;
     }
 
     const total = PDFViewer.getNumPages();
@@ -245,25 +267,26 @@
       parts.push('--- Page ' + p + ' ---\n' + text);
     };
 
-    // Anchor page: from the anchor's end to the next highlight (or page end)
+    // Anchor page: from the anchor's START (includes the highlighted text) to
+    // the boundary highlight (or page end)
     pushSlice(anchorRange.page, anchorRange.idx.full.slice(
-      anchorRange.end, next && next.page === anchorRange.page ? next.start : undefined
+      anchorRange.start, boundary && boundary.page === anchorRange.page ? boundary.start : undefined
     ));
 
-    // Intermediate pages (full text) between the anchor page and the next
-    // highlight (or, with no next highlight, through the end of the document)
-    const lastLoopPage = next ? next.page : total + 1;
+    // Intermediate pages (full text) between the anchor page and the boundary
+    // (or, with no boundary, through the end of the document)
+    const lastLoopPage = boundary ? boundary.page : total + 1;
     for (let p = anchorRange.page + 1; p < lastLoopPage; p++) {
       pushSlice(p, await getPageText(p));
     }
 
-    // Final page: up to the next highlight's start
-    if (next && next.page > anchorRange.page) {
-      pushSlice(next.page, next.idx.full.slice(0, next.start));
+    // Final page: up to the boundary highlight's start (highlight excluded)
+    if (boundary && boundary.page > anchorRange.page) {
+      pushSlice(boundary.page, boundary.idx.full.slice(0, boundary.start));
     }
 
-    const label = next
-      ? 'Highlights p.' + anchorRange.page + '→' + next.page
+    const label = boundary
+      ? 'Highlights p.' + anchorRange.page + '→' + boundary.page
       : 'Highlights p.' + anchorRange.page + '→' + total;
     return { text: parts.join('\n\n'), pages, label };
   };

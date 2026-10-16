@@ -19,6 +19,7 @@ const AIPanel = (() => {
     pdfContext: '',
     contextScope: 'entirePage',
     pageCount: 1,
+    highlightCount: '1',
     promptTemplate: I18N.t('ai.defaultPrompt'),
     includeNotes: true,
     howManyAnnotations: '',
@@ -90,6 +91,8 @@ const AIPanel = (() => {
     els.contextScope = $('aiContextScope');
     els.pageCount = $('aiPageCount');
     els.pageCountWrap = $('aiPageCountWrap');
+    els.highlightCount = $('aiHighlightCount');
+    els.highlightCountWrap = $('aiHighlightCountWrap');
     els.send = $('aiSend');
     els.stop = $('aiStop');
     els.queueBadge = $('aiQueueBadge');
@@ -140,6 +143,7 @@ const AIPanel = (() => {
     els.promptTemplate.value = settings.promptTemplate;
     els.contextScope.value = settings.contextScope;
     els.pageCount.value = settings.pageCount;
+    els.highlightCount.value = settings.highlightCount != null ? settings.highlightCount : '1';
     els.autoHowMany.value = settings.howManyAnnotations;
     els.autoNotes.checked = settings.includeNotes;
     els.autoTemplate.value = settings.autoAnnotateTemplate || I18N.t('ai.defaultAutoPrompt');
@@ -162,6 +166,7 @@ const AIPanel = (() => {
     settings.promptTemplate = els.promptTemplate.value;
     settings.contextScope = els.contextScope.value;
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
+    settings.highlightCount = els.highlightCount.value.trim();
     settings.howManyAnnotations = els.autoHowMany.value.trim();
     settings.includeNotes = els.autoNotes.checked;
     settings.autoAnnotateTemplate = els.autoTemplate.value;
@@ -173,6 +178,9 @@ const AIPanel = (() => {
 
   function updatePageCountVisibility() {
     els.pageCountWrap.hidden = els.contextScope.value !== 'entirePages';
+    if (els.highlightCountWrap) {
+      els.highlightCountWrap.hidden = els.contextScope.value !== 'untilNextHighlight';
+    }
   }
 
   /* ---------- Events ---------- */
@@ -183,7 +191,7 @@ const AIPanel = (() => {
     });
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
-     els.systemPrompt, els.pdfContext, els.contextScope, els.pageCount, els.autoHowMany,
+     els.systemPrompt, els.pdfContext, els.contextScope, els.pageCount, els.highlightCount, els.autoHowMany,
      els.autoTemplate, els.mindmapLevels, els.mindmapMode, els.mindmapTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });

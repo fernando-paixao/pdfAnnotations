@@ -473,3 +473,16 @@ All four tasks implemented per the plan, syntax-checked, and the new ZIP codec v
 
 Note: `PROMPTS.md` and `js/annotations-ui.js` also show as modified in git — those are pre-existing uncommitted changes from before this session (your prompt log and the markdown-notes feature), untouched. All manual validation steps from the plan's Validation section are ready for you to run.
 ---
+Both changes are in. Summary:
+
+**Include the anchor highlight text** — the span now starts at the anchor's beginning (`slice(anchorRange.start, …)` in `getHighlightSpan`, app.js), so the highlighted text itself is part of `$text`, while the boundary highlight remains excluded.
+
+**"Number of highlights ahead" option** — when the scope `Current highlight → next highlight` is selected, a new input appears next to it (same pattern as "Number of pages"):
+- `1` (default) = current behavior: anchor → next highlight (excluded)
+- `N` = the boundary advances N highlights, so one send covers anchor → Nth next highlight — the intermediate highlights' text is included, only the final boundary is excluded
+- **empty** = runs to the end of the document, so you can click a highlight, send, then click the boundary highlight of that send and repeat to walk a whole book segment by segment
+
+The count persists in the AI settings (`highlightCount`), is saved/restored with the rest of the panel, and has en/pt-BR i18n (`ai.highlightCount` / `ai.highlightCountPlaceholder`). README's scope bullet was updated to describe the new behavior. Syntax-checked all touched files.
+
+For your book workflow: click highlight → set the field empty (or a few highlights) → Send → click the highlight where the previous send stopped → Send again.
+---
