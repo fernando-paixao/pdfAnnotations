@@ -187,6 +187,20 @@ const Storage = (() => {
     return p(s.get(pdfId));
   }
 
+  /* ---------- Bulk reads (used by Backup) ---------- */
+  async function getAllAnnotations() {
+    const s = await store('annotations', 'readonly');
+    return p(s.getAll());
+  }
+  async function getAllNamespaces() {
+    const s = await store('namespaces', 'readonly');
+    return p(s.getAll());
+  }
+  async function getAllPdfMeta() {
+    const s = await store('pdfs', 'readonly');
+    return p(s.getAll());
+  }
+
   /* ---------- Stable PDF id via SHA-256 (with file:// fallback) ---------- */
   async function hashFile(file) {
     try {
@@ -214,6 +228,8 @@ const Storage = (() => {
     getAnnotationsByPdf, getAnnotationsByPage,
     // PDF metadata
     savePdfMeta, getPdfMeta,
+    // Bulk reads
+    getAllAnnotations, getAllNamespaces, getAllPdfMeta,
     hashFile,
   };
 })();

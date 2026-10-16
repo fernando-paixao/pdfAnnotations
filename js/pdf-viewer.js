@@ -13,6 +13,8 @@ const PDFViewer = (() => {
   let pageViewports = [];     // base viewports (scale 1)
   let renderedGen = [];       // render generation per page (to cancel stale)
   let currentGen = 0;
+  let activeRenderTasks = new Map(); // pageNumber -> in-flight PDF.js render task
+  let postScrollCheckTimer = null;   // debounced self-healing re-render after scroll
   let observer = null;
   let dpr = window.devicePixelRatio || 1;
   let textContentCache = []; // 1-indexed: cached getTextContent results
@@ -33,6 +35,7 @@ const PDFViewer = (() => {
     viewer.addEventListener('scroll', () => {
       const n = computeVisiblePage();
       if (n && callbacks.onVisiblePageChange) callbacks.onVisiblePageChange(n);
+      schedulePostScrollCheck(); // self-healing pass (reset on every scroll)
     });
   }
 
@@ -45,10 +48,15 @@ const PDFViewer = (() => {
   async function loadArrayBuffer(buffer) {
     setWorker();
     // Destroy previous document if any
-    if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
+    if (pdfDoc) {
+      activeRenderTasks.forEach((t) => { try { t.cancel(); } catch (e) {} });
+      activeRenderTasks.clear();
+      try { pdfDoc.destroy(); } catch (e) {}
+    }
     pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
     numPages = pdfDoc.numPages;
     currentGen++;
+    activeRenderTasks = new Map();
     pageWrappers = new Array(numPages + 1);
     pageViewports = new Array(numPages + 1);
     renderedGen = new Array(numPages + 1).fill(0);
@@ -109,7 +117,7 @@ const PDFViewer = (() => {
     for (let i = 1; i <= numPages; i++) observer.observe(pageWrappers[i]);
   }
 
-  async function renderPage(pageNumber) {
+  async function renderPage(pageNumber, isRetry) {
     if (!pdfDoc) return;
     const myGen = currentGen;
     if (renderedGen[pageNumber] === myGen) return; // already rendered at this gen
@@ -135,13 +143,31 @@ const PDFViewer = (() => {
       // Stale check (zoom may have bumped currentGen)
       if (myGen !== currentGen) return;
 
+      // Cancel any still-active render on this canvas before starting a new
+      // one — a second render() on the same canvas while the first is active
+      // fails with a canvas-in-use error and leaves the page white.
+      const prevTask = activeRenderTasks.get(pageNumber);
+      if (prevTask) {
+        try { prevTask.cancel(); } catch (e) { /* already settled */ }
+        try { await prevTask.promise; } catch (e) { /* RenderingCancelledException expected */ }
+        if (activeRenderTasks.get(pageNumber) === prevTask) activeRenderTasks.delete(pageNumber);
+        // Re-check state: zoom/other renders may have happened while waiting
+        if (myGen !== currentGen) return;
+        if (renderedGen[pageNumber] !== myGen) return; // a newer render superseded us
+      }
+
       const ctx = canvas.getContext('2d');
       const renderTask = page.render({
         canvasContext: ctx,
         viewport,
         transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
       });
-      await renderTask.promise;
+      activeRenderTasks.set(pageNumber, renderTask);
+      try {
+        await renderTask.promise;
+      } finally {
+        if (activeRenderTasks.get(pageNumber) === renderTask) activeRenderTasks.delete(pageNumber);
+      }
       if (myGen !== currentGen) return;
 
       // Text layer (transparent, selectable)
@@ -179,9 +205,36 @@ const PDFViewer = (() => {
       }
     } catch (err) {
       if (err && err.name !== 'RenderingCancelledException') {
-        console.error('Render error page', pageNumber, err);
+        const msg = String((err && err.message) || err);
+        // Canvas-in-use / render conflict: one deferred retry usually heals it
+        if (/same canvas|multiple render|canvas-in-use|render conflict/i.test(msg)) {
+          if (renderedGen[pageNumber] === myGen) renderedGen[pageNumber] = 0;
+          if (!isRetry) setTimeout(() => renderPage(pageNumber, true), 0);
+          else console.error('Render error page', pageNumber, err);
+        } else {
+          console.error('Render error page', pageNumber, err);
+        }
       }
     }
+  }
+
+  // Debounced post-scroll self-healing: once scrolling settles, re-render any
+  // page intersecting the viewport that is not rendered at the current
+  // generation (heals pages missed by the observer after zoom + scroll).
+  function schedulePostScrollCheck() {
+    if (!pdfDoc) return;
+    if (postScrollCheckTimer) clearTimeout(postScrollCheckTimer);
+    postScrollCheckTimer = setTimeout(() => {
+      postScrollCheckTimer = null;
+      if (!pdfDoc) return;
+      const vr = viewerEl.getBoundingClientRect();
+      for (let i = 1; i <= numPages; i++) {
+        if (renderedGen[i] === currentGen) continue;
+        if (!pageWrappers[i]) continue;
+        const r = pageWrappers[i].getBoundingClientRect();
+        if (r.bottom > vr.top && r.top < vr.bottom) renderPage(i);
+      }
+    }, 250);
   }
 
   function computeVisiblePage() {
@@ -205,16 +258,17 @@ const PDFViewer = (() => {
     scale = newScale;
     currentGen++;
     renderedGen.fill(0);
-    // Resize placeholders immediately; actual re-render happens via observer
+    // Resize placeholders immediately; actual re-render happens via observer.
+    // Keep the old canvas bitmap as a CSS-scaled preview (no blank flash);
+    // text/highlight layers are cleared inside renderPage/onPageRendered.
     for (let i = 1; i <= numPages; i++) {
       const vp = pageViewports[i];
       const wrapper = pageWrappers[i];
       wrapper.style.width = Math.floor(vp.width * scale) + 'px';
       wrapper.style.height = Math.floor(vp.height * scale) + 'px';
-      wrapper.querySelector('canvas').width = 0;
-      wrapper.querySelector('canvas').height = 0;
-      wrapper.querySelector('.textLayer').innerHTML = '';
-      wrapper.querySelector('.highlight-layer').innerHTML = '';
+      const canvas = wrapper.querySelector('canvas');
+      canvas.style.width = Math.floor(vp.width * scale) + 'px';
+      canvas.style.height = Math.floor(vp.height * scale) + 'px';
     }
     spanMaps = new Array(numPages + 1);
     if (callbacks.onScaleChange) callbacks.onScaleChange(scale);
@@ -227,6 +281,9 @@ const PDFViewer = (() => {
       }
       if (visiblePage) goToPage(visiblePage);
     });
+    // Self-healing pass: after the scroll induced by goToPage settles,
+    // re-render anything visible still missing at the current generation.
+    schedulePostScrollCheck();
   }
 
   function zoomIn() { setScale(scale * 1.2); }

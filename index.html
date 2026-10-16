@@ -55,6 +55,9 @@
         <span data-i18n="toolbar.import">Import</span>
         <input type="file" id="importInput" accept="application/json,.json" hidden />
       </label>
+      <button id="backupBtn" data-i18n="toolbar.backup" data-i18n-title="toolbar.backupTitle" title="Save a full backup of all data as a zip file">Backup</button>
+      <button id="restoreBtn" data-i18n="toolbar.restore" data-i18n-title="toolbar.restoreTitle" title="Restore annotations from a backup (.zip or .json)">Restore</button>
+      <input type="file" id="restoreInput" accept=".zip,.json" hidden />
     </div>
 
     <button id="aiToggle" class="ai-toggle" data-i18n="toolbar.ai" data-i18n-title="ai.localOllama" title="Toggle AI panel (local Ollama)">AI</button>
@@ -179,6 +182,7 @@
               <option value="selectedText" data-i18n="ai.scope.selectedText">Selected text</option>
               <option value="entirePage" selected data-i18n="ai.scope.entirePage">Entire current page</option>
               <option value="entirePages" data-i18n="ai.scope.entirePages">Multiple pages (from current)</option>
+              <option value="untilNextHighlight" data-i18n="ai.scope.untilNextHighlight">Current highlight → next highlight</option>
             </select>
           </label>
           <label id="aiPageCountWrap" hidden><span data-i18n="ai.pageCount">Number of pages</span>
@@ -324,6 +328,28 @@
           <span data-i18n="settings.translateLang">Google Translate target language (e.g. en, pt, es)</span>
           <input type="text" id="translateLangInput" data-i18n-placeholder="settings.translateLangPlaceholder" placeholder="en" maxlength="5" />
         </label>
+        <label class="settings-check">
+          <input type="checkbox" id="markdownNotesToggle" />
+          <span data-i18n="settings.markdownNotes">Render annotation notes as Markdown</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup reminder (reuses settings-modal styling) -->
+  <div id="backupReminder" class="settings-modal" hidden>
+    <div class="settings-modal-content">
+      <div class="settings-modal-header">
+        <h2 data-i18n="backup.reminderTitle">Backup reminder</h2>
+        <button id="backupReminderClose" class="settings-close">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <p id="backupReminderBody" class="backup-reminder-body" data-i18n="backup.reminderBody">You have never made a backup of your annotations. Create one now?</p>
+        <p class="hint backup-reminder-hint" data-i18n="backup.reminderHint">Backups include all namespaces and annotations and are saved as a zip file.</p>
+        <div class="backup-reminder-actions">
+          <button id="backupLaterBtn" data-i18n="backup.later">Later</button>
+          <button id="backupNowBtn" class="primary" data-i18n="backup.now">Backup now</button>
+        </div>
       </div>
     </div>
   </div>
@@ -335,6 +361,7 @@
   <script src="lib/pdf.min.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/backup.js"></script>
   <script src="js/pdf-viewer.js"></script>
   <script src="js/highlighter.js"></script>
   <script src="js/text-geometry.js"></script>

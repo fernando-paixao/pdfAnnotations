@@ -40,6 +40,9 @@ Two AI features that call a **local Ollama** instance directly from the browser:
   - `Selected text` — the current text selection
   - `Entire current page` — all text on the visible page
   - `Multiple pages` — current page + N pages
+  - `Current highlight → next highlight` — from the last clicked highlight up to
+    (not including) the next one, continuing across pages until the next highlight
+    or the end of the document
 - Click **Send** — the response streams into the panel.
 
 #### 2. Auto-Annotate
@@ -48,6 +51,16 @@ Two AI features that call a **local Ollama** instance directly from the browser:
 - Toggle **Include notes** (on = AI returns a short note per passage; off = snippets only).
 - Click **Annotate** — the AI identifies important passages, the app matches them to the
   page text, and creates highlight annotations automatically (green tint).
+
+### Full Backup & Restore
+- Click **Backup** in the toolbar to save **all** namespaces, annotations, and PDF
+  metadata — across every PDF — as a single `.zip` file you can store anywhere
+  (uncompressed ZIP, no external libraries involved).
+- Click **Restore** and pick a backup `.zip` (or a plain `.json` export) to bring the
+  data back. Restoring is idempotent — re-importing the same backup is safe.
+- A non-blocking reminder appears on app load if the last backup is more than **7 days**
+  old; making a successful backup silences it for another week ("Later" dismisses it
+  for the current session only).
 
 ## ⚠️ Ollama CORS Setup (required for browser access)
 
@@ -80,6 +93,7 @@ If you see a CORS error in the AI panel, this is the fix.
 | [`index.html`](index.html) | App shell: toolbar, viewer, side panel, AI panel |
 | [`css/styles.css`](css/styles.css) | All styling |
 | [`js/storage.js`](js/storage.js) | IndexedDB wrapper (annotations + PDF metadata, SHA-256 file id) |
+| [`js/backup.js`](js/backup.js) | Full backup as a zip (no libraries), restore, 7-day reminder |
 | [`js/pdf-viewer.js`](js/pdf-viewer.js) | PDF.js rendering (canvas + text layer), lazy load, zoom, navigation |
 | [`js/highlighter.js`](js/highlighter.js) | Text selection → highlight overlay, click-to-edit popover |
 | [`js/text-geometry.js`](js/text-geometry.js) | Shared text indexing + text-range → rect conversion |

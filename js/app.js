@@ -10,6 +10,7 @@
   let currentPage = 1;
   let currentNamespaceId = null;
   let currentNamespaces = [];
+  let lastClickedAnnotationId = null; // anchor for the "highlight → next highlight" AI scope
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
@@ -42,6 +43,7 @@
   const debugTextToggle = $('debugTextToggle');
   const ccImagesToggle = $('ccImagesToggle');
   const translateLangInput = $('translateLangInput');
+  const markdownNotesToggle = $('markdownNotesToggle');
 
   // ---------- Helpers ----------
   function uuid() {
@@ -107,6 +109,7 @@
   };
   Highlighter.callbacks.annotationChanged = () => refreshUI();
   Highlighter.callbacks.onAnnotationClicked = (id) => {
+    lastClickedAnnotationId = id;
     AnnotationsUI.scrollToAnnotation(id);
   };
 
@@ -135,6 +138,7 @@
 
   AnnotationsUI.init($('annotationList'), $('annotationCount'), searchBox, $('emptyAnnotations'));
   AnnotationsUI.callbacks.onJump = (id) => {
+    lastClickedAnnotationId = id;
     const ann = findById(id);
     if (!ann) return;
     PDFViewer.goToPage(ann.page);
@@ -178,6 +182,91 @@
     const idx = TextGeometry.buildIndex(tc);
     return idx.full;
   }
+
+  // ---------- AI scope: current highlight → next highlight ----------
+  /** Resolve an annotation's char range (page + [start,end)) in that page's
+   *  full-text index. Uses stored textStart/textEnd when present, falling back
+   *  to findSnippetRange for legacy annotations. Returns null when unresolvable. */
+  async function resolveAnnotationRange(ann) {
+    if (!ann || typeof ann.page !== 'number') return null;
+    const tc = await PDFViewer.getTextContent(ann.page);
+    if (!tc) return null;
+    const idx = TextGeometry.buildIndex(tc);
+    if (ann.textStart != null && ann.textEnd != null &&
+        ann.textStart >= 0 && ann.textEnd <= idx.full.length) {
+      return { page: ann.page, start: ann.textStart, end: ann.textEnd, idx };
+    }
+    if (ann.textSelected && ann.textSelected.trim()) {
+      const range = TextGeometry.findSnippetRange(idx, ann.textSelected);
+      if (range) return { page: ann.page, start: range.start, end: range.end, idx };
+    }
+    return null;
+  }
+
+  AIPanel.callbacks.getLastClickedAnnotation = () => {
+    if (lastClickedAnnotationId == null) return null;
+    return findById(lastClickedAnnotationId) || null;
+  };
+
+  /**
+   * Build the text span from the anchor highlight up to (not including) the
+   * next highlight, continuing across pages until the next highlight or the
+   * end of the document. Returns { text, pages, label } or null (caller
+   * falls back to the entire-page scope).
+   */
+  AIPanel.callbacks.getHighlightSpan = async (anchor) => {
+    const anchorRange = await resolveAnnotationRange(anchor);
+    if (!anchorRange) return null;
+
+    // Ordered candidates from all annotations in the current namespace
+    const candidates = [];
+    for (const a of currentAnnotations) {
+      const r = await resolveAnnotationRange(a);
+      if (r) candidates.push({ ann: a, page: r.page, start: r.start, end: r.end, idx: r.idx });
+    }
+    candidates.sort((x, y) => (x.page - y.page) || (x.start - y.start));
+
+    // Next highlight = first candidate lexicographically after (anchorPage, anchorEnd)
+    let next = null;
+    for (const c of candidates) {
+      if (c.ann.id === anchor.id) continue;
+      if (c.page > anchorRange.page ||
+          (c.page === anchorRange.page && c.start >= anchorRange.end)) {
+        next = c;
+        break;
+      }
+    }
+
+    const total = PDFViewer.getNumPages();
+    const pages = [];
+    const parts = [];
+    const pushSlice = (p, text) => {
+      pages.push({ page: p, text });
+      parts.push('--- Page ' + p + ' ---\n' + text);
+    };
+
+    // Anchor page: from the anchor's end to the next highlight (or page end)
+    pushSlice(anchorRange.page, anchorRange.idx.full.slice(
+      anchorRange.end, next && next.page === anchorRange.page ? next.start : undefined
+    ));
+
+    // Intermediate pages (full text) between the anchor page and the next
+    // highlight (or, with no next highlight, through the end of the document)
+    const lastLoopPage = next ? next.page : total + 1;
+    for (let p = anchorRange.page + 1; p < lastLoopPage; p++) {
+      pushSlice(p, await getPageText(p));
+    }
+
+    // Final page: up to the next highlight's start
+    if (next && next.page > anchorRange.page) {
+      pushSlice(next.page, next.idx.full.slice(0, next.start));
+    }
+
+    const label = next
+      ? 'Highlights p.' + anchorRange.page + '→' + next.page
+      : 'Highlights p.' + anchorRange.page + '→' + total;
+    return { text: parts.join('\n\n'), pages, label };
+  };
 
   // ---------- AI Panel ----------
   const aiPanel = $('aiPanel');
@@ -238,6 +327,7 @@
   // ---------- Namespace management ----------
   async function selectNamespace(nsId) {
     currentNamespaceId = nsId;
+    lastClickedAnnotationId = null;
     Highlighter.setNamespaceId(nsId);
     const anns = await Storage.getAnnotationsByNamespace(nsId);
     currentAnnotations = anns.slice();
@@ -313,6 +403,7 @@
     try {
       showToast(I18N.t('msg.loading'));
       currentFileName = file.name;
+      lastClickedAnnotationId = null;
 
       // 1) Stable PDF id
       const pdfId = await Storage.hashFile(file);
@@ -411,9 +502,15 @@
     return (localStorage.getItem('translateLang') || '').trim();
   };
 
+  // Markdown notes setting: persisted in localStorage, exposed globally
+  window.getMarkdownNotes = function () {
+    return localStorage.getItem('markdownNotes') === '1';
+  };
+
   // Restore saved settings on load
   ccImagesToggle.checked = window.getCcImagesEnabled();
   translateLangInput.value = window.getTranslateLang();
+  markdownNotesToggle.checked = window.getMarkdownNotes();
 
   settingsBtn.addEventListener('click', () => {
     settingsModal.hidden = false;
@@ -442,6 +539,12 @@
   // Google Translate target language
   translateLangInput.addEventListener('change', () => {
     localStorage.setItem('translateLang', translateLangInput.value.trim());
+  });
+
+  // Markdown notes toggle
+  markdownNotesToggle.addEventListener('change', () => {
+    localStorage.setItem('markdownNotes', markdownNotesToggle.checked ? '1' : '0');
+    refreshUI();
   });
 
   // Keyboard shortcuts when viewer focused
@@ -516,6 +619,102 @@
     const n = PDFViewer.getNumPages();
     for (let i = 1; i <= n; i++) Highlighter.redrawPage(i);
   }
+
+  // ---------- Backup / Restore (full-data zip) ----------
+  const backupBtn = $('backupBtn');
+  const restoreBtn = $('restoreBtn');
+  const restoreInput = $('restoreInput');
+  const backupReminder = $('backupReminder');
+
+  async function runBackup() {
+    backupBtn.disabled = true;
+    try {
+      const ok = await Backup.saveBackup();
+      if (ok) showToast(I18N.t('msg.backupSaved'));
+    } catch (err) {
+      console.error(err);
+      showToast(I18N.t('msg.backupFailed') + ' ' + (err && err.message ? err.message : err));
+    } finally {
+      backupBtn.disabled = false;
+    }
+  }
+
+  backupBtn.addEventListener('click', runBackup);
+
+  restoreBtn.addEventListener('click', () => restoreInput.click());
+
+  restoreInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    restoreInput.value = '';
+    if (!f) return;
+    try {
+      const payload = await Backup.parseBackupFile(f);
+      const counts = await Backup.restore(payload);
+      // Reload state for the current PDF (namespace selection re-reads annotations)
+      if (currentPdfId) {
+        currentNamespaces = await Storage.getNamespacesByPdf(currentPdfId);
+        if (currentNamespaces.length > 0) {
+          const target = currentNamespaces.some((n) => n.id === currentNamespaceId)
+            ? currentNamespaceId
+            : currentNamespaces[0].id;
+          await selectNamespace(target);
+        } else {
+          currentAnnotations = [];
+          Highlighter.setAnnotations(currentAnnotations);
+          refreshUI();
+          redrawVisiblePages();
+        }
+      }
+      showToast(I18N.t('msg.restored') + ' ' + counts.annotations + ' ' + I18N.t('msg.annotation_s'));
+    } catch (err) {
+      console.error(err);
+      showToast(I18N.t('msg.restoreFailed') + ' ' + (err && err.message ? err.message : err));
+    }
+  });
+
+  // ---------- 7-day backup reminder ----------
+  let backupReminderDismissed = false; // "Later" dismisses for this session only
+
+  function showBackupReminder() {
+    if (backupReminderDismissed || backupReminder.hidden === false) return;
+    const last = Backup.getLastBackupAt();
+    const bodyEl = $('backupReminderBody');
+    if (last) {
+      const days = Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000));
+      bodyEl.textContent = I18N.t('backup.reminderBodyDays').replace('{n}', String(days));
+    } else {
+      bodyEl.textContent = I18N.t('backup.reminderBody');
+    }
+    backupReminder.hidden = false;
+  }
+
+  function dismissBackupReminder() {
+    backupReminder.hidden = true;
+    backupReminderDismissed = true;
+  }
+
+  $('backupNowBtn').addEventListener('click', () => {
+    backupReminder.hidden = true;
+    runBackup();
+  });
+  $('backupLaterBtn').addEventListener('click', dismissBackupReminder);
+  $('backupReminderClose').addEventListener('click', dismissBackupReminder);
+  backupReminder.addEventListener('click', (e) => {
+    if (e.target === backupReminder) dismissBackupReminder();
+  });
+
+  async function checkBackupReminder() {
+    try {
+      await Storage.openDB();
+      const [anns, nss] = await Promise.all([Storage.getAllAnnotations(), Storage.getAllNamespaces()]);
+      if (anns.length === 0 && nss.length === 0) return;
+      if (!Backup.isReminderDue()) return;
+      showBackupReminder();
+    } catch (err) {
+      // Storage unavailable — no reminder
+    }
+  }
+  checkBackupReminder();
 
   // ---------- Language selector ----------
   if (langSelect) {

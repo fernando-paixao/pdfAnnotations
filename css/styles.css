@@ -452,6 +452,10 @@ body.debug-text .highlight-rect {
   font-style: italic;
   margin-top: 6px;
 }
+.annotation-item .note-text.markdown-body {
+  font-style: normal;
+  color: var(--text);
+}
 .empty-annotations {
   padding: 20px 16px;
   color: var(--text-dim);
@@ -996,4 +1000,34 @@ body.ai-open .ai-backdrop {
   color: #8a8ab5;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* Copy button on RESP entries in the debug log */
+.debug-copy-btn {
+  float: right;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.debug-copy-btn:hover { background: var(--accent); border-color: var(--accent); }
+.debug-copy-btn.copied { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* ===== Backup reminder (reuses .settings-modal chrome) ===== */
+.backup-reminder-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.backup-reminder-hint { margin: 0; }
+.backup-reminder-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

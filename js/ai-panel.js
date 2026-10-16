@@ -261,6 +261,19 @@ const AIPanel = (() => {
       if (sel && sel.trim()) return { text: sel.trim(), pages: [] };
       // fall back to current page if nothing selected
     }
+    var scopeHint;
+    if (scope === 'untilNextHighlight') {
+      const anchor = callbacks.getLastClickedAnnotation ? callbacks.getLastClickedAnnotation() : null;
+      if (anchor && callbacks.getHighlightSpan) {
+        const span = await callbacks.getHighlightSpan(anchor);
+        if (span && span.text && span.text.trim()) {
+          return { text: span.text, pages: span.pages || [], label: span.label };
+        }
+      }
+      // No anchor highlight (or unresolvable) — hint and fall back to pages
+      scopeHint = I18N.t('ai.status.noAnchorHighlight');
+      els.status.textContent = scopeHint;
+    }
     const currentPage = callbacks.getCurrentPage ? callbacks.getCurrentPage() : 1;
     const total = PDFViewer.getNumPages();
     let count = 1;
@@ -274,7 +287,7 @@ const AIPanel = (() => {
       pages.push({ page: p, text });
       parts.push('--- Page ' + p + ' ---\n' + text);
     }
-    return { text: parts.join('\n\n'), pages };
+    return { text: parts.join('\n\n'), pages, hint: scopeHint };
   }
 
   /* ---------- View mode toggle ---------- */
@@ -294,24 +307,24 @@ const AIPanel = (() => {
     }
   }
 
-  /* ---------- Copy response to clipboard ---------- */
-  function copyResponse(btn) {
-    var text = els.response.textContent || '';
-    if (!text.trim()) return;
+  /* ---------- Clipboard helper (shared) ---------- */
+  // Copies text; flips `btn` to a ✓ state for ~1.5s on success.
+  // Falls back to execCommand('copy') for non-secure contexts (file://).
+  function copyTextToClipboard(text, btn) {
     function showCopied() {
+      if (!btn) return;
       var label = btn.querySelector('span');
-      var original = label ? label.textContent : '';
+      var original = label ? label.textContent : btn.textContent;
       btn.classList.add('copied');
       if (label) label.textContent = '✓';
+      else btn.textContent = '✓';
       setTimeout(function () {
         btn.classList.remove('copied');
         if (label) label.textContent = original;
+        else btn.textContent = original;
       }, 1500);
     }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(showCopied).catch(function () {});
-    } else {
-      // Fallback for older browsers / non-secure contexts
+    function fallbackCopy() {
       var ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
@@ -321,6 +334,18 @@ const AIPanel = (() => {
       try { document.execCommand('copy'); showCopied(); } catch (e) {}
       ta.remove();
     }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  /* ---------- Copy response to clipboard ---------- */
+  function copyResponse(btn) {
+    var text = els.response.textContent || '';
+    if (!text.trim()) return;
+    copyTextToClipboard(text, btn);
   }
 
   /* ---------- Retry helpers ---------- */
@@ -418,7 +443,9 @@ const AIPanel = (() => {
 
     // Build a human-readable label for this action
     let label;
-    if (ctx.pages.length > 0) {
+    if (ctx.label) {
+      label = ctx.label;
+    } else if (ctx.pages.length > 0) {
       label = ctx.pages.length === 1
         ? 'Page ' + ctx.pages[0].page
         : 'Pages ' + ctx.pages.map((p) => p.page).join(',');
@@ -426,7 +453,7 @@ const AIPanel = (() => {
       label = 'Selected text';
     }
 
-    const item = { id: ++queueIdCounter, messages, label };
+    const item = { id: ++queueIdCounter, messages, label, hint: ctx.hint || '' };
 
     if (!isProcessing) {
       // Execute immediately
@@ -455,7 +482,8 @@ const AIPanel = (() => {
 
     abortController = new AbortController();
     try {
-      els.status.textContent = I18N.t('ai.status.generating') + ' #' + item.id + ' (' + item.label + ')…';
+      els.status.textContent = (item.hint ? item.hint + ' ' : '') +
+        I18N.t('ai.status.generating') + ' #' + item.id + ' (' + item.label + ')…';
       const result = await chatWithRetry({
         host: settings.host,
         model: settings.model,
@@ -833,6 +861,19 @@ const AIPanel = (() => {
     if (!els.debugLog) return;
     const entry = document.createElement('div');
     entry.className = 'debug-entry';
+    // Copy button for AI response entries (floats to the entry's top-right)
+    if (category === 'RESP' && typeof data === 'string' && data) {
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'debug-copy-btn';
+      copyBtn.title = I18N.t('ai.debugCopy');
+      copyBtn.textContent = '📋';
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(data, copyBtn);
+      });
+      entry.appendChild(copyBtn);
+    }
     const time = new Date().toLocaleTimeString([], { hour12: false }) + '.' +
       String(Date.now() % 1000).padStart(3, '0');
     const tag = document.createElement('span');

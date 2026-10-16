@@ -434,3 +434,42 @@ Awesome!
 Now you can add a button in the place where I have the "Debug text layer" (.debug-btn) and open a modal with configurations? There can be:
 - the "Debug text layer" button
 - A parametrization to google image search button look only the images free from copywright laws?
+---
+Great!
+Can you add a new parametrization to render in markdown editor instead of textarea (as it's today) the annotation text?
+--- New prompt
+I'm with a problem when I change the Zoom that sometimes I need to change the page back then page foward to re-render the page after appearing only an white screen as the page was entirely blank.
+---
+I want to have a selection to when send $text to AI of the current highlighted text until the next highlighted text (not including the next highlighted text) as an option.
+---
+I want to have a fallback storage backup to my stored highlights.
+I had some trouble that have lost all my stored data.
+I want something that I can trust and maybe store backups in other place on my disk so I can recover if something went wrong.
+Maybe the application could remind me each 7 days of making a zip with the actual stored data and save it. Storing the information that I already make it to avoid continue asking me for do it.
+---
+I want to have a button to copy the Debug AI response to clipboard.
+---
+All four tasks implemented per the plan, syntax-checked, and the new ZIP codec verified against an independent implementation. Summary:
+
+**Task 1 — Zoom blank-page fix** (`js/pdf-viewer.js`)
+- `renderPage` now tracks the in-flight render task per page (`activeRenderTasks`), cancels + awaits any previous task before starting a new render on the same canvas, and deletes entries on settle. Generation guards (`renderedGen`/`currentGen`) are preserved.
+- `setScale` no longer blanks canvases — it CSS-scales the old bitmap as a preview; bitmaps resize inside `renderPage` as before.
+- Debounced 250 ms post-scroll self-healing pass re-renders visible pages still not at the current generation (reset on every scroll).
+- Canvas-in-use errors get exactly one deferred retry; `RenderingCancelledException` stays silent.
+
+**Task 2 — AI scope "Current highlight → next highlight"** (`index.html`, `js/i18n.js`, `js/ai-panel.js`, `js/app.js`)
+- New `untilNextHighlight` option; anchor = last clicked highlight (PDF click or side-panel jump), cleared on PDF load / namespace switch.
+- `AIPanel.callbacks.getHighlightSpan` (app.js) resolves offsets (`textStart/textEnd`, `findSnippetRange` fallback), picks the next highlight lexicographically, slices anchor page → intermediate full pages → next-highlight start (continuing to document end if none), and returns `{ text, pages, label }` (e.g. `Highlights p.3→7`). Populated `pages` keeps Auto-Annotate and Mindmap perPage working unchanged.
+- On no anchor: status hint `ai.status.noAnchorHighlight` and graceful fall-through to entire-page scope.
+
+**Task 3 — Backup/Restore + 7-day reminder** (new `js/backup.js`, `js/storage.js`, `index.html`, `js/app.js`, `css/styles.css`, `js/i18n.js`, `README.md`)
+- `Backup.saveBackup()` writes a single-entry STORE-method zip (CRC32/headers/central dir/EOCD, zero dependencies) via `showSaveFilePicker` with download-anchor fallback; user-cancel (`AbortError`) never updates `pdf-ann-last-backup-at`.
+- `parseBackupFile` accepts `.zip` (own format only, clear errors for foreign zips) or `.json`; `restore` upserts by id (idempotent) and returns counts. Restore re-selects the namespace and redraws.
+- Reminder modal (settings-modal styling) appears on load when data exists and the last backup is >7 days; **Backup now** marks the timestamp on success, **Later** dismisses for the session only.
+- Verified in isolation: round-trip parse, UTF-8 integrity, idempotent restore counts, and Windows `Expand-Archive` successfully expanding the generated zip.
+
+**Task 4 — Debug response copy** (`js/ai-panel.js`, `css/styles.css`, `js/i18n.js`)
+- Each `RESP` debug entry gets a compact 📋 button (top-right) copying that response's text; clipboard logic extracted into shared `copyTextToClipboard` with `execCommand` fallback for `file://`, ✓ feedback on success. `ai.debugCopy` i18n added (en + pt-BR).
+
+Note: `PROMPTS.md` and `js/annotations-ui.js` also show as modified in git — those are pre-existing uncommitted changes from before this session (your prompt log and the markdown-notes feature), untouched. All manual validation steps from the plan's Validation section are ready for you to run.
+---

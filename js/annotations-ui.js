@@ -87,7 +87,12 @@ const AnnotationsUI = (() => {
       if (ann.annotationText) {
         const note = document.createElement('div');
         note.className = 'note-text';
-        note.textContent = '📝 ' + ann.annotationText;
+        if (typeof window.getMarkdownNotes === 'function' && window.getMarkdownNotes()) {
+          note.classList.add('markdown-body');
+          note.innerHTML = '📝 ' + Markdown.render(ann.annotationText);
+        } else {
+          note.textContent = '📝 ' + ann.annotationText;
+        }
         li.appendChild(note);
       }
 
