@@ -51,6 +51,9 @@ Two AI features that call a **local Ollama** instance directly from the browser:
     starting highlight, and **Skip if the highlight already has a note** (on by
     default) leaves existing notes untouched.
 - Click **Send** — the response streams into the panel.
+- While actions are waiting, a collapsible **Queued actions** list appears: click an
+  entry to inspect the full request (system/user messages), or cancel it individually
+  with ✕. **Stop** aborts the running response and clears the whole queue.
 
 #### 2. Auto-Annotate
 - In the AI panel, open the **Auto-Annotate** section.

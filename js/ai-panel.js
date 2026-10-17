@@ -41,9 +41,10 @@ const AIPanel = (() => {
   const RETRY_DELAY_MS = 2000;
 
   // Queue state
-  let queue = [];             // [{id, messages, label}]
+  let queue = [];             // [{id, messages, label, hint, annotationId}]
   let isProcessing = false;
   let queueIdCounter = 0;
+  let expandedQueueId = null; // queue item whose details are shown
   let audioCtx = null;
 
   const callbacks = {
@@ -102,6 +103,9 @@ const AIPanel = (() => {
     els.stop = $('aiStop');
     els.queueBadge = $('aiQueueBadge');
     els.clearQueue = $('aiClearQueue');
+    els.queueDetails = $('aiQueueDetails');
+    els.queueList = $('aiQueueList');
+    els.queueCount = $('aiQueueCount');
     els.response = $('aiResponse');
     els.responseMd = $('aiResponseMd');
     els.viewText = $('aiViewText');
@@ -667,6 +671,87 @@ const AIPanel = (() => {
     if (els.clearQueue) {
       els.clearQueue.hidden = n === 0;
     }
+    renderQueueList();
+  }
+
+  /* ---------- Queued actions list ---------- */
+  function renderQueueList() {
+    if (!els.queueDetails || !els.queueList) return;
+    if (queue.length === 0) {
+      els.queueDetails.hidden = true;
+      els.queueDetails.open = false;
+      els.queueList.innerHTML = '';
+      expandedQueueId = null;
+      if (els.queueCount) els.queueCount.textContent = '';
+      return;
+    }
+    els.queueDetails.hidden = false;
+    if (els.queueCount) els.queueCount.textContent = '(' + queue.length + ')';
+    els.queueList.innerHTML = '';
+    queue.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'queue-item';
+      row.title = I18N.t('ai.queueDetailsHint');
+      const label = document.createElement('span');
+      label.className = 'queue-item-label';
+      label.textContent = '#' + item.id + ' — ' + item.label;
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'queue-item-cancel';
+      cancel.textContent = '✕';
+      cancel.title = I18N.t('ai.queueCancel');
+      cancel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cancelQueueItem(item.id);
+      });
+      row.appendChild(label);
+      row.appendChild(cancel);
+      row.addEventListener('click', () => toggleQueueDetails(item.id));
+      els.queueList.appendChild(row);
+
+      if (expandedQueueId === item.id) {
+        const det = document.createElement('div');
+        det.className = 'queue-item-details';
+        det.appendChild(buildQueueDetails(item));
+        els.queueList.appendChild(det);
+      }
+    });
+  }
+
+  /** Build the request details view: meta line + role/content per message. */
+  function buildQueueDetails(item) {
+    const wrap = document.createElement('div');
+    const meta = document.createElement('div');
+    meta.className = 'queue-detail-meta';
+    meta.textContent = '#' + item.id + ' · ' + item.label +
+      (item.hint ? ' · ' + item.hint : '');
+    wrap.appendChild(meta);
+    (item.messages || []).forEach((m) => {
+      const role = document.createElement('div');
+      role.className = 'queue-detail-role queue-detail-role-' + m.role;
+      role.textContent = m.role;
+      const pre = document.createElement('pre');
+      pre.className = 'queue-detail-content';
+      pre.textContent = m.content;
+      wrap.appendChild(role);
+      wrap.appendChild(pre);
+    });
+    return wrap;
+  }
+
+  function toggleQueueDetails(id) {
+    expandedQueueId = expandedQueueId === id ? null : id;
+    renderQueueList();
+  }
+
+  function cancelQueueItem(id) {
+    const item = queue.find((it) => it.id === id);
+    if (!item) return;
+    queue = queue.filter((it) => it.id !== id);
+    if (expandedQueueId === id) expandedQueueId = null;
+    debugLog('INFO', '#' + id + ' cancelled — removed from queue (' + item.label + ')');
+    updateQueueUI();
+    els.status.textContent = I18N.t('ai.status.requestCancelled').replace('{id}', id);
   }
 
   /* ---------- Sound (Web Audio API, no external files) ---------- */

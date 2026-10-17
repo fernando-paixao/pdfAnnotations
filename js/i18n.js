@@ -110,6 +110,10 @@ const I18N = (() => {
       'ai.send': 'Send',
       'ai.stop': 'Stop',
       'ai.clearQueue': 'Clear Queue',
+      'ai.queueList': 'Queued actions',
+      'ai.queueCancel': 'Cancel this request',
+      'ai.queueDetailsHint': 'Click to show/hide request details',
+      'ai.status.requestCancelled': 'Request #{id} cancelled.',
 
       // Response
       'ai.response': 'Response',
@@ -360,6 +364,10 @@ const I18N = (() => {
       'ai.send': 'Enviar',
       'ai.stop': 'Parar',
       'ai.clearQueue': 'Limpar Fila',
+      'ai.queueList': 'Ações enfileiradas',
+      'ai.queueCancel': 'Cancelar esta ação',
+      'ai.queueDetailsHint': 'Clique para mostrar/ocultar detalhes do pedido',
+      'ai.status.requestCancelled': 'Pedido #{id} cancelado.',
 
       // Response
       'ai.response': 'Resposta',

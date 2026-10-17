@@ -494,3 +494,5 @@ Fixed. The `hidden` attribute is now respected globally (`css/styles.css`), so:
 
 The show/hide logic itself was already wired in `js/ai-panel.js` (`updatePageCountVisibility`, bound to the scope's `change` event and run at load) — it just never took visual effect because `.ai-form label { display: flex }` overrode the browser's default `[hidden] { display: none }`. The new `[hidden] { display: none !important; }` rule also fixes the same latent bug elsewhere: the Export/Import/Backup/Restore group, search box, nav and zoom groups, and the namespace bar previously stayed visible before any PDF was loaded.
 ---
+Awesome, now can you show a collapsable list of the enqueued AI requests with a button to cancel that request and show details of the request if I click in one of them
+---
