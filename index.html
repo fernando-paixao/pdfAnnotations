@@ -192,6 +192,10 @@
             <input type="number" id="aiHighlightCount" value="1" min="1" max="500"
               data-i18n-placeholder="ai.highlightCountPlaceholder" placeholder="leave empty = until the end" />
           </label>
+          <div id="aiHighlightNoteWrap" class="check-col" hidden>
+            <label class="check"><input type="checkbox" id="aiNoteFromResponse" checked /> <span data-i18n="ai.noteFromResponse">Add AI response as note to highlight</span></label>
+            <label class="check"><input type="checkbox" id="aiSkipIfNoteExists" checked /> <span data-i18n="ai.skipIfNoteExists">Skip if the highlight already has a note</span></label>
+          </div>
           <div class="row">
             <button id="aiSend" class="primary" data-i18n="ai.send">Send</button>
             <button id="aiStop" class="danger" hidden data-i18n="ai.stop">Stop</button>

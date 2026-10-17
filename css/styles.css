@@ -715,6 +715,7 @@ body.ai-open .ai-backdrop {
   color: var(--text);
 }
 .ai-form .check input { width: auto; }
+.ai-form .check-col { display: flex; flex-direction: column; gap: 6px; }
 .ai-form button.small { padding: 6px 10px; font-size: 12px; }
 .ai-form .hint {
   font-size: 11px;

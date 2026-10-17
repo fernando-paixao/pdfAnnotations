@@ -309,7 +309,7 @@
     const label = boundary
       ? 'Highlights p.' + anchorRange.page + '→' + boundary.page
       : 'Highlights p.' + anchorRange.page + '→' + total;
-    return { text, pages, label };
+    return { text, pages, label, anchorId: anchor.id };
   };
 
   /**
@@ -351,9 +351,27 @@
         pages,
         label: 'Highlights p.' + starts[i].page + '→' + endPage +
           ' (' + (i + 1) + '/' + starts.length + ')',
+        anchorId: i === 0 ? anchor.id : starts[i].ann.id,
       });
     }
     return { segments };
+  };
+
+  /**
+   * Store `note` as an annotation's note text. With opts.skipIfExists the
+   * existing note is preserved. Returns 'added', 'exists' (existing note
+   * kept), or null when the annotation no longer exists.
+   */
+  AIPanel.callbacks.addNoteToAnnotation = async (id, note, opts) => {
+    const ann = findById(id);
+    if (!ann) return null;
+    if (opts && opts.skipIfExists && ann.annotationText && ann.annotationText.trim()) return 'exists';
+    ann.annotationText = note;
+    ann.updatedAt = Date.now();
+    await Storage.updateAnnotation(ann);
+    Highlighter.refreshAnnotation(ann);
+    refreshUI();
+    return 'added';
   };
 
   // ---------- AI Panel ----------

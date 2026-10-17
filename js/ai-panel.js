@@ -20,6 +20,8 @@ const AIPanel = (() => {
     contextScope: 'entirePage',
     pageCount: 1,
     highlightCount: '1',
+    noteFromResponse: true,
+    skipIfNoteExists: true,
     promptTemplate: I18N.t('ai.defaultPrompt'),
     includeNotes: true,
     howManyAnnotations: '',
@@ -93,6 +95,9 @@ const AIPanel = (() => {
     els.pageCountWrap = $('aiPageCountWrap');
     els.highlightCount = $('aiHighlightCount');
     els.highlightCountWrap = $('aiHighlightCountWrap');
+    els.noteFromResponse = $('aiNoteFromResponse');
+    els.skipIfNoteExists = $('aiSkipIfNoteExists');
+    els.highlightNoteWrap = $('aiHighlightNoteWrap');
     els.send = $('aiSend');
     els.stop = $('aiStop');
     els.queueBadge = $('aiQueueBadge');
@@ -144,6 +149,8 @@ const AIPanel = (() => {
     els.contextScope.value = settings.contextScope;
     els.pageCount.value = settings.pageCount;
     els.highlightCount.value = settings.highlightCount != null ? settings.highlightCount : '1';
+    els.noteFromResponse.checked = !!settings.noteFromResponse;
+    els.skipIfNoteExists.checked = !!settings.skipIfNoteExists;
     els.autoHowMany.value = settings.howManyAnnotations;
     els.autoNotes.checked = settings.includeNotes;
     els.autoTemplate.value = settings.autoAnnotateTemplate || I18N.t('ai.defaultAutoPrompt');
@@ -167,6 +174,8 @@ const AIPanel = (() => {
     settings.contextScope = els.contextScope.value;
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
     settings.highlightCount = els.highlightCount.value.trim();
+    settings.noteFromResponse = els.noteFromResponse.checked;
+    settings.skipIfNoteExists = els.skipIfNoteExists.checked;
     settings.howManyAnnotations = els.autoHowMany.value.trim();
     settings.includeNotes = els.autoNotes.checked;
     settings.autoAnnotateTemplate = els.autoTemplate.value;
@@ -180,6 +189,9 @@ const AIPanel = (() => {
     els.pageCountWrap.hidden = els.contextScope.value !== 'entirePages';
     if (els.highlightCountWrap) {
       els.highlightCountWrap.hidden = els.contextScope.value !== 'untilNextHighlight';
+    }
+    if (els.highlightNoteWrap) {
+      els.highlightNoteWrap.hidden = els.contextScope.value !== 'untilNextHighlight';
     }
   }
 
@@ -195,7 +207,8 @@ const AIPanel = (() => {
      els.autoTemplate, els.mindmapLevels, els.mindmapMode, els.mindmapTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
-    [els.reasoning, els.streaming, els.soundEnabled, els.autoNotes].forEach((el) => {
+    [els.reasoning, els.streaming, els.soundEnabled, els.autoNotes,
+     els.noteFromResponse, els.skipIfNoteExists].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
     els.contextScope.addEventListener('change', updatePageCountVisibility);
@@ -287,12 +300,14 @@ const AIPanel = (() => {
           // Empty count → enqueue the whole chain of segments
           const segs = await callbacks.getHighlightSegments(anchor);
           if (segs && Array.isArray(segs.segments) && segs.segments.length > 0) {
-            ctxs = segs.segments.map((s) => ({ text: s.text, pages: s.pages || [], label: s.label }));
+            ctxs = segs.segments.map((s) => ({
+              text: s.text, pages: s.pages || [], label: s.label, annotationId: s.anchorId,
+            }));
           }
         } else if (hasCount && callbacks.getHighlightSpan) {
           const span = await callbacks.getHighlightSpan(anchor);
           if (span && span.text && span.text.trim()) {
-            ctxs = [{ text: span.text, pages: span.pages || [], label: span.label }];
+            ctxs = [{ text: span.text, pages: span.pages || [], label: span.label, annotationId: span.anchorId }];
           }
         }
         if (ctxs) return ctxs;
@@ -494,7 +509,7 @@ const AIPanel = (() => {
         label = 'Selected text';
       }
 
-      return { id: ++queueIdCounter, messages, label, hint: ctx.hint || '' };
+      return { id: ++queueIdCounter, messages, label, hint: ctx.hint || '', annotationId: ctx.annotationId };
     });
 
     // Item 0 executes immediately when idle (processQueueItem sets
@@ -570,7 +585,11 @@ const AIPanel = (() => {
       }, item);
       if (!settings.streaming) els.response.textContent = result;
       els.responseMd.innerHTML = Markdown.render(els.response.textContent);
-      els.status.textContent = '✓ ' + I18N.t('ai.status.done') + ' #' + item.id + ' (' + item.label + ')';
+      let noteSuffix = '';
+      const noteState = await addNoteFromResponse(item, els.response.textContent);
+      if (noteState === 'added') noteSuffix = ' — 📝 ' + I18N.t('ai.status.noteAdded');
+      if (noteState === 'skipped') noteSuffix = ' — 📝 ' + I18N.t('ai.status.noteSkipped');
+      els.status.textContent = '✓ ' + I18N.t('ai.status.done') + ' #' + item.id + ' (' + item.label + ')' + noteSuffix;
       playCompletionSound();
     } catch (err) {
       if (err && err.name === 'AbortError') {
@@ -606,6 +625,30 @@ const AIPanel = (() => {
       queue = [];
       updateQueueUI();
     }
+  }
+
+  /**
+   * Store the AI response as a note on the highlight that started the segment
+   * (annotationId is only set for the "Current highlight → next highlight"
+   * scope). Returns 'added', 'skipped' (existing note kept) or null.
+   */
+  async function addNoteFromResponse(item, responseText) {
+    if (!settings.noteFromResponse || !item.annotationId) return null;
+    if (!responseText || !responseText.trim()) return null;
+    if (!callbacks.addNoteToAnnotation) return null;
+    const result = await callbacks.addNoteToAnnotation(item.annotationId, responseText.trim(), {
+      skipIfExists: settings.skipIfNoteExists,
+    });
+    if (result === 'added') {
+      debugLog('INFO', '#' + item.id + ' note added to highlight (' + item.label + ')');
+      return 'added';
+    }
+    if (result === 'exists') {
+      debugLog('INFO', '#' + item.id + ' note skipped — highlight already has a note (' + item.label + ')');
+      return 'skipped';
+    }
+    debugLog('INFO', '#' + item.id + ' note skipped — highlight no longer exists (' + item.label + ')');
+    return null;
   }
 
   function clearQueue() {

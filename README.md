@@ -46,6 +46,10 @@ Two AI features that call a **local Ollama** instance directly from the browser:
     still produces one combined send), or leave it empty to enqueue one send per
     highlight segment from a single click of **Send**: current → next, next →
     next-next, … last → end of document (handy for summarizing a book in parts).
+    With this scope two extra options appear: **Add AI response as note to
+    highlight** (on by default) stores each response as the note of the segment's
+    starting highlight, and **Skip if the highlight already has a note** (on by
+    default) leaves existing notes untouched.
 - Click **Send** — the response streams into the panel.
 
 #### 2. Auto-Annotate
