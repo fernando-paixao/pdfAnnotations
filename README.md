@@ -42,8 +42,10 @@ Two AI features that call a **local Ollama** instance directly from the browser:
   - `Multiple pages` — current page + N pages
   - `Current highlight → next highlight` — from the last clicked highlight (its text
     included) up to — not including — the next one, continuing across pages. Set
-    **Number of highlights ahead** to cross several highlights in one send, or leave
-    it empty to run until the end of the document (handy for summarizing a book in parts).
+    **Number of highlights ahead** to cross several highlights in one send (a number
+    still produces one combined send), or leave it empty to enqueue one send per
+    highlight segment from a single click of **Send**: current → next, next →
+    next-next, … last → end of document (handy for summarizing a book in parts).
 - Click **Send** — the response streams into the panel.
 
 #### 2. Auto-Annotate

@@ -209,24 +209,76 @@
   };
 
   /**
-   * Build the text span starting at the anchor highlight (inclusive) up to —
-   * but not including — the boundary highlight. By default the boundary is the
-   * next highlight; "Number of highlights ahead" advances the boundary several
-   * highlights further, and an empty value runs to the end of the document.
-   * Returns { text, pages, label } or null (caller falls back to the
-   * entire-page scope).
+   * Slice the document text from a resolved range's START (inclusive) up to —
+   * but not including — the boundary range. With no boundary, runs to the end
+   * of the document. Returns { text, pages }.
    */
-  AIPanel.callbacks.getHighlightSpan = async (anchor) => {
-    const anchorRange = await resolveAnnotationRange(anchor);
-    if (!anchorRange) return null;
+  async function sliceSpan(fromRange, boundary) {
+    const total = PDFViewer.getNumPages();
+    const pages = [];
+    const parts = [];
+    const pushSlice = (p, text) => {
+      pages.push({ page: p, text });
+      parts.push('--- Page ' + p + ' ---\n' + text);
+    };
 
-    // Ordered candidates from all annotations in the current namespace
+    // Start page: from the range's START (includes the highlighted text) to
+    // the boundary highlight (or page end)
+    pushSlice(fromRange.page, fromRange.idx.full.slice(
+      fromRange.start, boundary && boundary.page === fromRange.page ? boundary.start : undefined
+    ));
+
+    // Intermediate pages (full text) between the start page and the boundary
+    // (or, with no boundary, through the end of the document)
+    const lastLoopPage = boundary ? boundary.page : total + 1;
+    for (let p = fromRange.page + 1; p < lastLoopPage; p++) {
+      pushSlice(p, await getPageText(p));
+    }
+
+    // Final page: up to the boundary highlight's start (highlight excluded)
+    if (boundary && boundary.page > fromRange.page) {
+      pushSlice(boundary.page, boundary.idx.full.slice(0, boundary.start));
+    }
+
+    return { text: parts.join('\n\n'), pages };
+  }
+
+  /** Resolve every annotation in the namespace to candidate ranges sorted by
+   *  (page, start). Unresolvable (legacy/corrupt) annotations are skipped. */
+  async function collectHighlightCandidates() {
     const candidates = [];
     for (const a of currentAnnotations) {
       const r = await resolveAnnotationRange(a);
       if (r) candidates.push({ ann: a, page: r.page, start: r.start, end: r.end, idx: r.idx });
     }
     candidates.sort((x, y) => (x.page - y.page) || (x.start - y.start));
+    return candidates;
+  }
+
+  /** First candidate lexicographically at/after (cursor.page, cursor.end)
+   *  that is not in `used`, or null when the chain has ended. */
+  function nextBoundary(candidates, cursor, used) {
+    for (const c of candidates) {
+      if (used.has(c.ann.id)) continue;
+      if (c.page > cursor.page || (c.page === cursor.page && c.start >= cursor.end)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Build the text span starting at the anchor highlight (inclusive) up to —
+   * but not including — the boundary highlight. "Number of highlights ahead"
+   * advances the boundary several highlights further; an empty value runs to
+   * the end of the document. Returns { text, pages, label } or null (caller
+   * falls back to the entire-page scope).
+   */
+  AIPanel.callbacks.getHighlightSpan = async (anchor) => {
+    const anchorRange = await resolveAnnotationRange(anchor);
+    if (!anchorRange) return null;
+
+    const candidates = await collectHighlightCandidates();
 
     // How many next-highlight boundaries to advance (empty/invalid = to the end)
     let maxSteps = null;
@@ -244,14 +296,7 @@
     let boundary = null;
     let steps = 0;
     while (maxSteps === null || steps < maxSteps) {
-      let cand = null;
-      for (const c of candidates) {
-        if (used.has(c.ann.id)) continue;
-        if (c.page > cursor.page || (c.page === cursor.page && c.start >= cursor.end)) {
-          cand = c;
-          break;
-        }
-      }
+      const cand = nextBoundary(candidates, cursor, used);
       if (!cand) break;
       boundary = cand;
       used.add(cand.ann.id);
@@ -259,36 +304,56 @@
       steps++;
     }
 
+    const { text, pages } = await sliceSpan(anchorRange, boundary);
     const total = PDFViewer.getNumPages();
-    const pages = [];
-    const parts = [];
-    const pushSlice = (p, text) => {
-      pages.push({ page: p, text });
-      parts.push('--- Page ' + p + ' ---\n' + text);
-    };
-
-    // Anchor page: from the anchor's START (includes the highlighted text) to
-    // the boundary highlight (or page end)
-    pushSlice(anchorRange.page, anchorRange.idx.full.slice(
-      anchorRange.start, boundary && boundary.page === anchorRange.page ? boundary.start : undefined
-    ));
-
-    // Intermediate pages (full text) between the anchor page and the boundary
-    // (or, with no boundary, through the end of the document)
-    const lastLoopPage = boundary ? boundary.page : total + 1;
-    for (let p = anchorRange.page + 1; p < lastLoopPage; p++) {
-      pushSlice(p, await getPageText(p));
-    }
-
-    // Final page: up to the boundary highlight's start (highlight excluded)
-    if (boundary && boundary.page > anchorRange.page) {
-      pushSlice(boundary.page, boundary.idx.full.slice(0, boundary.start));
-    }
-
     const label = boundary
       ? 'Highlights p.' + anchorRange.page + '→' + boundary.page
       : 'Highlights p.' + anchorRange.page + '→' + total;
-    return { text: parts.join('\n\n'), pages, label };
+    return { text, pages, label };
+  };
+
+  /**
+   * Split the highlight chain starting at the anchor into contiguous segments:
+   * segment i = [boundary i-1 … boundary i), each boundary highlight excluded
+   * from its segment and included as the start of the next; the last segment
+   * runs to the end of the document. Used when "Number of highlights ahead" is
+   * empty so each segment can be enqueued as its own AI action.
+   * Returns { segments: [{ text, pages, label }] } or null when the anchor is
+   * unresolvable. Zero boundaries after the anchor ⇒ a single segment.
+   */
+  AIPanel.callbacks.getHighlightSegments = async (anchor) => {
+    const anchorRange = await resolveAnnotationRange(anchor);
+    if (!anchorRange) return null;
+
+    const candidates = await collectHighlightCandidates();
+
+    // Walk highlight → next highlight collecting ALL boundaries after the
+    // anchor (the used-id set guarantees termination)
+    const used = new Set([anchor.id]);
+    const starts = [anchorRange];
+    let cursor = { page: anchorRange.page, end: anchorRange.end };
+    for (;;) {
+      const cand = nextBoundary(candidates, cursor, used);
+      if (!cand) break;
+      starts.push(cand);
+      used.add(cand.ann.id);
+      cursor = { page: cand.page, end: cand.end };
+    }
+
+    const total = PDFViewer.getNumPages();
+    const segments = [];
+    for (let i = 0; i < starts.length; i++) {
+      const boundary = i + 1 < starts.length ? starts[i + 1] : null;
+      const { text, pages } = await sliceSpan(starts[i], boundary);
+      const endPage = boundary ? boundary.page : total;
+      segments.push({
+        text,
+        pages,
+        label: 'Highlights p.' + starts[i].page + '→' + endPage +
+          ' (' + (i + 1) + '/' + starts.length + ')',
+      });
+    }
+    return { segments };
   };
 
   // ---------- AI Panel ----------

@@ -171,6 +171,7 @@ const I18N = (() => {
       'ai.status.corsHintSettings': 'Make sure Ollama is running and started with',
       'ai.status.corsAllow': 'to allow browser access.',
       'ai.status.generating': 'Generating…',
+      'ai.status.queuedMany': 'Queued {n} actions — starting with "{label}"',
 
       // Auto-annotate status
       'auto.starting': 'Starting…',
@@ -416,6 +417,7 @@ const I18N = (() => {
       'ai.status.corsHintSettings': 'Certifique-se de que o Ollama está rodando e foi iniciado com',
       'ai.status.corsAllow': 'para permitir acesso do navegador.',
       'ai.status.generating': 'Gerando…',
+      'ai.status.queuedMany': 'Enfileiradas {n} ações — começando com "{label}"',
 
       // Auto-annotate status
       'auto.starting': 'Iniciando…',

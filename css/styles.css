@@ -4,6 +4,11 @@
 
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute must always win, even over display:flex/grid rules
+   (e.g. .ai-form label, .data-group). Without this, "hidden" fields like the
+   context-scope options stay visible. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #1e1e2e;
   --bg-panel: #252537;

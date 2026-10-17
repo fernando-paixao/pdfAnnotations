@@ -486,3 +486,11 @@ The count persists in the AI settings (`highlightCount`), is saved/restored with
 
 For your book workflow: click highlight → set the field empty (or a few highlights) → Send → click the highlight where the previous send stopped → Send again.
 ---
+Fixed. The `hidden` attribute is now respected globally (`css/styles.css`), so:
+
+- **Entire current page / Selected text** → both fields hidden
+- **Multiple pages (from current)** → only "Number of pages" shows
+- **Current highlight → next highlight** → only "Number of highlights ahead" shows
+
+The show/hide logic itself was already wired in `js/ai-panel.js` (`updatePageCountVisibility`, bound to the scope's `change` event and run at load) — it just never took visual effect because `.ai-form label { display: flex }` overrode the browser's default `[hidden] { display: none }`. The new `[hidden] { display: none !important; }` rule also fixes the same latent bug elsewhere: the Export/Import/Backup/Restore group, search box, nav and zoom groups, and the namespace bar previously stayed visible before any PDF was loaded.
+---

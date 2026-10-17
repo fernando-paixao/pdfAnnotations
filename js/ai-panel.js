@@ -262,21 +262,40 @@ const AIPanel = (() => {
   }
 
   /* ---------- Gather context ---------- */
-  async function gatherContext() {
+  /**
+   * Gather one or more contexts. Most scopes produce a single context; the
+   * "current highlight → next highlight" scope with an EMPTY "Number of
+   * highlights ahead" produces one context per highlight segment, so each can
+   * be enqueued as its own AI action.
+   */
+  async function gatherContexts() {
     const scope = els.contextScope.value;
     if (scope === 'selectedText') {
       const sel = callbacks.getSelectedText ? callbacks.getSelectedText() : '';
-      if (sel && sel.trim()) return { text: sel.trim(), pages: [] };
+      if (sel && sel.trim()) return [{ text: sel.trim(), pages: [] }];
       // fall back to current page if nothing selected
     }
     var scopeHint;
     if (scope === 'untilNextHighlight') {
       const anchor = callbacks.getLastClickedAnnotation ? callbacks.getLastClickedAnnotation() : null;
-      if (anchor && callbacks.getHighlightSpan) {
-        const span = await callbacks.getHighlightSpan(anchor);
-        if (span && span.text && span.text.trim()) {
-          return { text: span.text, pages: span.pages || [], label: span.label };
+      if (anchor) {
+        const rawCount = String(settings.highlightCount || '').trim();
+        const n = rawCount !== '' ? parseInt(rawCount, 10) : NaN;
+        const hasCount = !isNaN(n) && n > 0;
+        let ctxs = null;
+        if (!hasCount && callbacks.getHighlightSegments) {
+          // Empty count → enqueue the whole chain of segments
+          const segs = await callbacks.getHighlightSegments(anchor);
+          if (segs && Array.isArray(segs.segments) && segs.segments.length > 0) {
+            ctxs = segs.segments.map((s) => ({ text: s.text, pages: s.pages || [], label: s.label }));
+          }
+        } else if (hasCount && callbacks.getHighlightSpan) {
+          const span = await callbacks.getHighlightSpan(anchor);
+          if (span && span.text && span.text.trim()) {
+            ctxs = [{ text: span.text, pages: span.pages || [], label: span.label }];
+          }
         }
+        if (ctxs) return ctxs;
       }
       // No anchor highlight (or unresolvable) — hint and fall back to pages
       scopeHint = I18N.t('ai.status.noAnchorHighlight');
@@ -295,7 +314,18 @@ const AIPanel = (() => {
       pages.push({ page: p, text });
       parts.push('--- Page ' + p + ' ---\n' + text);
     }
-    return { text: parts.join('\n\n'), pages, hint: scopeHint };
+    return [{ text: parts.join('\n\n'), pages, hint: scopeHint }];
+  }
+
+  // Merged single context for Mindmap / Auto-Annotate (they never enqueue)
+  async function gatherContext() {
+    const list = await gatherContexts();
+    return {
+      text: list.map((c) => c.text).join('\n\n'),
+      pages: list.flatMap((c) => c.pages),
+      label: list[0].label,
+      hint: list[0].hint,
+    };
   }
 
   /* ---------- View mode toggle ---------- */
@@ -432,45 +462,61 @@ const AIPanel = (() => {
       return;
     }
 
-    // Gather context NOW (captures current page/selection state)
+    // Gather contexts NOW (captures current page/selection state)
     els.status.textContent = isProcessing
       ? I18N.t('ai.status.queuing')
       : I18N.t('ai.status.gathering');
-    const ctx = await gatherContext();
+    const contexts = await gatherContexts();
     const pdfCtx = settings.pdfContext && settings.pdfContext.trim()
       ? settings.pdfContext.trim()
       : '';
-    const prompt = settings.promptTemplate
-      .replace(/\$pdfContext/g, pdfCtx)
-      .replace(/\$text/g, ctx.text);
-    const messages = [];
-    if (settings.systemPrompt && settings.systemPrompt.trim()) {
-      messages.push({ role: 'system', content: settings.systemPrompt.trim() });
-    }
-    messages.push({ role: 'user', content: prompt });
 
-    // Build a human-readable label for this action
-    let label;
-    if (ctx.label) {
-      label = ctx.label;
-    } else if (ctx.pages.length > 0) {
-      label = ctx.pages.length === 1
-        ? 'Page ' + ctx.pages[0].page
-        : 'Pages ' + ctx.pages.map((p) => p.page).join(',');
-    } else {
-      label = 'Selected text';
-    }
+    // Build one queue item per context (same prompt-building for each)
+    const items = contexts.map((ctx) => {
+      const prompt = settings.promptTemplate
+        .replace(/\$pdfContext/g, pdfCtx)
+        .replace(/\$text/g, ctx.text);
+      const messages = [];
+      if (settings.systemPrompt && settings.systemPrompt.trim()) {
+        messages.push({ role: 'system', content: settings.systemPrompt.trim() });
+      }
+      messages.push({ role: 'user', content: prompt });
 
-    const item = { id: ++queueIdCounter, messages, label, hint: ctx.hint || '' };
+      // Build a human-readable label for this action
+      let label;
+      if (ctx.label) {
+        label = ctx.label;
+      } else if (ctx.pages.length > 0) {
+        label = ctx.pages.length === 1
+          ? 'Page ' + ctx.pages[0].page
+          : 'Pages ' + ctx.pages.map((p) => p.page).join(',');
+      } else {
+        label = 'Selected text';
+      }
 
-    if (!isProcessing) {
-      // Execute immediately
-      processQueueItem(item);
-    } else {
-      // Add to queue
-      queue.push(item);
+      return { id: ++queueIdCounter, messages, label, hint: ctx.hint || '' };
+    });
+
+    // Item 0 executes immediately when idle (processQueueItem sets
+    // isProcessing synchronously), everything else waits in the queue
+    const wasBusy = isProcessing;
+    items.forEach((item, i) => {
+      if (i === 0 && !wasBusy) {
+        processQueueItem(item);
+      } else {
+        queue.push(item);
+      }
+    });
+
+    if (items.length > 1) {
       updateQueueUI();
-      els.status.textContent = 'Queued #' + item.id + ' (' + label + ') — position ' + queue.length;
+      els.status.textContent = I18N.t('ai.status.queuedMany')
+        .replace('{n}', queue.length)
+        .replace('{label}', items[0].label);
+      playQueueSound();
+    } else if (wasBusy) {
+      updateQueueUI();
+      els.status.textContent = 'Queued #' + items[0].id + ' (' + items[0].label + ') — position ' + queue.length;
       playQueueSound();
     }
   }
