@@ -106,6 +106,9 @@ const AIPanel = (() => {
     els.queueDetails = $('aiQueueDetails');
     els.queueList = $('aiQueueList');
     els.queueCount = $('aiQueueCount');
+    els.queueSelectAll = $('aiQueueSelectAll');
+    els.queueRemoveSelected = $('aiQueueRemoveSelected');
+    els.queueRemoveCount = $('aiQueueRemoveCount');
     els.response = $('aiResponse');
     els.responseMd = $('aiResponseMd');
     els.viewText = $('aiViewText');
@@ -225,6 +228,15 @@ const AIPanel = (() => {
     els.send.addEventListener('click', onSend);
     els.stop.addEventListener('click', onStop);
     els.clearQueue.addEventListener('click', clearQueue);
+    if (els.queueSelectAll) {
+      els.queueSelectAll.addEventListener('change', () => {
+        queue.forEach((it) => { it.selected = els.queueSelectAll.checked; });
+        renderQueueList();
+      });
+    }
+    if (els.queueRemoveSelected) {
+      els.queueRemoveSelected.addEventListener('click', removeSelectedQueueItems);
+    }
     els.viewText.addEventListener('click', () => setViewMode('text'));
     els.viewMarkdown.addEventListener('click', () => setViewMode('markdown'));
     els.copyTop.addEventListener('click', () => copyResponse(els.copyTop));
@@ -513,7 +525,7 @@ const AIPanel = (() => {
         label = 'Selected text';
       }
 
-      return { id: ++queueIdCounter, messages, label, hint: ctx.hint || '', annotationId: ctx.annotationId };
+      return { id: ++queueIdCounter, messages, label, hint: ctx.hint || '', annotationId: ctx.annotationId, selected: true };
     });
 
     // Item 0 executes immediately when idle (processQueueItem sets
@@ -690,8 +702,18 @@ const AIPanel = (() => {
     els.queueList.innerHTML = '';
     queue.forEach((item) => {
       const row = document.createElement('div');
-      row.className = 'queue-item';
+      row.className = 'queue-item' + (item.selected === false ? ' queue-item-unselected' : '');
       row.title = I18N.t('ai.queueDetailsHint');
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = item.selected !== false;
+      check.className = 'queue-item-check';
+      check.addEventListener('click', (e) => e.stopPropagation());
+      check.addEventListener('change', () => {
+        item.selected = check.checked;
+        row.classList.toggle('queue-item-unselected', !check.checked);
+        updateQueueSelectionUI();
+      });
       const label = document.createElement('span');
       label.className = 'queue-item-label';
       label.textContent = '#' + item.id + ' — ' + item.label;
@@ -704,6 +726,7 @@ const AIPanel = (() => {
         e.stopPropagation();
         cancelQueueItem(item.id);
       });
+      row.appendChild(check);
       row.appendChild(label);
       row.appendChild(cancel);
       row.addEventListener('click', () => toggleQueueDetails(item.id));
@@ -716,6 +739,33 @@ const AIPanel = (() => {
         els.queueList.appendChild(det);
       }
     });
+    updateQueueSelectionUI();
+  }
+
+  /** Sync the Select all checkbox and the Remove selected button/count. */
+  function updateQueueSelectionUI() {
+    if (!els.queueSelectAll || !els.queueRemoveSelected) return;
+    const selected = queue.filter((it) => it.selected !== false);
+    const all = queue.length > 0 && selected.length === queue.length;
+    els.queueSelectAll.checked = all;
+    els.queueSelectAll.indeterminate = !all && selected.length > 0;
+    els.queueRemoveSelected.disabled = selected.length === 0;
+    if (els.queueRemoveCount) {
+      els.queueRemoveCount.textContent = selected.length > 0 ? '(' + selected.length + ')' : '';
+    }
+  }
+
+  /** Remove every queued action whose checkbox is ticked. */
+  function removeSelectedQueueItems() {
+    const removed = queue.filter((it) => it.selected !== false);
+    if (removed.length === 0) return;
+    queue = queue.filter((it) => it.selected === false);
+    if (expandedQueueId != null && removed.some((it) => it.id === expandedQueueId)) {
+      expandedQueueId = null;
+    }
+    debugLog('INFO', removed.length + ' queued action(s) removed via Remove selected');
+    updateQueueUI();
+    els.status.textContent = I18N.t('msg.cleared') + ' ' + removed.length + ' ' + I18N.t('msg.queued') + '.';
   }
 
   /** Build the request details view: meta line + role/content per message. */

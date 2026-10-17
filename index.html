@@ -204,6 +204,10 @@
           </div>
           <details id="aiQueueDetails" class="ai-section queue-section" hidden>
             <summary><span data-i18n="ai.queueList">Queued actions</span> <span id="aiQueueCount"></span></summary>
+            <div class="queue-toolbar">
+              <label class="check"><input type="checkbox" id="aiQueueSelectAll" /> <span data-i18n="ai.queueSelectAll">Select all</span></label>
+              <button id="aiQueueRemoveSelected" class="small danger" disabled><span data-i18n="ai.queueRemoveSelected">Remove selected</span> <span id="aiQueueRemoveCount"></span></button>
+            </div>
             <div id="aiQueueList" class="queue-list"></div>
           </details>
         </div>

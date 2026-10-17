@@ -692,6 +692,16 @@ body.ai-open .ai-backdrop {
   50% { opacity: 0.6; }
 }
 .queue-section > summary { color: var(--text); }
+.queue-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 2px;
+  font-size: 12px;
+}
+.queue-toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
+.queue-toolbar button.danger:disabled:hover { background: transparent; color: var(--danger); }
 .queue-list {
   padding: 8px 10px 10px;
   display: flex;
@@ -714,6 +724,8 @@ body.ai-open .ai-backdrop {
   color: var(--text);
 }
 .queue-item:hover { border-color: var(--accent); }
+.queue-item input[type="checkbox"] { width: auto; flex: 0 0 auto; cursor: pointer; margin: 0; }
+.queue-item-unselected .queue-item-label { opacity: 0.45; text-decoration: line-through; }
 .queue-item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-item-cancel {
   background: none;
