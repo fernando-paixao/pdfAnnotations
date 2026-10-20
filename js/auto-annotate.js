@@ -138,7 +138,10 @@ const AutoAnnotate = (() => {
         if (callbacks.onProgress) callbacks.onProgress('Analyzing page ' + pg.page + '…');
         debug('AUTO', 'Page ' + pg.page + ': text length=' + pg.text.length + ' chars');
 
-        const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate, opts.pdfContext);
+        const summaryBlock = opts.summaryMap && opts.summaryMap.get(pg.page)
+          ? '---\n' + pg.page + '\n' + opts.summaryMap.get(pg.page)
+          : '';
+        const prompt = buildPrompt(pg.text, opts.howMany, opts.includeNotes, opts.promptTemplate, opts.pdfContext, summaryBlock);
         debug('AUTO', 'Page ' + pg.page + ': prompt length=' + prompt.length + ' chars');
         const messages = [];
         if (settings.systemPrompt && settings.systemPrompt.trim()) {
@@ -288,7 +291,7 @@ const AutoAnnotate = (() => {
   }
 
   /* ---------- Prompt building ---------- */
-  function buildPrompt(pageText, howMany, includeNotes, template, pdfContext) {
+  function buildPrompt(pageText, howMany, includeNotes, template, pdfContext, summaryBlock) {
     const countLine = howMany && howMany > 0
       ? 'Return exactly ' + howMany + ' of the most important passages.'
       : 'Return the most important passages (as many as you judge relevant).';
@@ -303,6 +306,7 @@ const AutoAnnotate = (() => {
       .replace(/\$howMany/g, countLine)
       .replace(/\$formatLine/g, formatLine)
       .replace(/\$pdfContext/g, ctx)
+      .replace(/\$summaryContext/g, () => summaryBlock || '')
       .replace(/\$pageText/g, pageText);
   }
 

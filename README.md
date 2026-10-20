@@ -50,6 +50,12 @@ Two AI features that call a **local Ollama** instance directly from the browser:
     highlight** (on by default) stores each response as the note of the segment's
     starting highlight, and **Skip if the highlight already has a note** (on by
     default) leaves existing notes untouched.
+- Optionally fill the **Summary Context** textarea with page-indexed entries —
+  a `---` line, then the page number, then any multiline text — and reference
+  **`$summaryContext`** in your Send, Mindmap or Auto-Annotate template. Only the
+  entries whose page numbers match the pages of the current request are injected
+  (each queued highlight segment / mindmap iteration / annotated page gets only
+  its own pages' entries; empty when nothing matches).
 - Click **Send** — the response streams into the panel.
 - While actions are waiting, a collapsible **Queued actions** list appears: click an
   entry to inspect the full request (system/user messages), untick entries and use

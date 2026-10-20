@@ -173,10 +173,17 @@
               placeholder="e.g. This is a research paper about quantum computing published in 2024. The author discusses…"></textarea>
             <p class="hint"><span data-i18n="ai.pdfContextHint">Background info injected into your prompt via</span> <code>$pdfContext</code>.</p>
           </details>
+          <details class="ai-subsection">
+            <summary data-i18n="ai.summaryContext">Summary Context (optional)</summary>
+            <textarea id="aiSummaryContext" rows="4"
+              data-i18n-placeholder="ai.summaryContextPlaceholder"
+              placeholder="---&#10;277&#10;PART V: WIDENING THE CIRCLE&#10;---&#10;278&#10;PART V: WIDENING THE CIRCLE&#10;CHAPTER FOURTEEN: Dialogue and the New Economy&#10;---"></textarea>
+            <p class="hint"><span data-i18n="ai.summaryContextHint">Entries matching the request's pages, injected via</span> <code>$summaryContext</code>.</p>
+          </details>
           <textarea id="aiPromptTemplate" rows="4"
             data-i18n-placeholder="ai.promptPlaceholder"
             placeholder="Write your prompt. Use $text where the PDF page text goes."></textarea>
-          <p class="hint"><span data-i18n="ai.promptHint">Placeholders:</span> <code>$text</code> <span data-i18n="ai.promptHintText">(page text)</span>, <code>$pdfContext</code> <span data-i18n="ai.promptHintContext">(your context above).</span></p>
+          <p class="hint"><span data-i18n="ai.promptHint">Placeholders:</span> <code>$text</code> <span data-i18n="ai.promptHintText">(page text)</span>, <code>$pdfContext</code> <span data-i18n="ai.promptHintContext">(your context above)</span>, <code>$summaryContext</code> <span data-i18n="ai.promptHintSummary">(page summaries)</span>.</p>
           <label><span data-i18n="ai.contextScope">Context scope</span>
             <select id="aiContextScope">
               <option value="selectedText" data-i18n="ai.scope.selectedText">Selected text</option>

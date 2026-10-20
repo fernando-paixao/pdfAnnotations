@@ -17,6 +17,7 @@ const AIPanel = (() => {
     soundEnabled: true,
     systemPrompt: '',
     pdfContext: '',
+    summaryContext: '',
     contextScope: 'entirePage',
     pageCount: 1,
     highlightCount: '1',
@@ -90,6 +91,7 @@ const AIPanel = (() => {
     els.soundEnabled = $('aiSoundEnabled');
     els.systemPrompt = $('aiSystemPrompt');
     els.pdfContext = $('aiPdfContext');
+    els.summaryContext = $('aiSummaryContext');
     els.promptTemplate = $('aiPromptTemplate');
     els.contextScope = $('aiContextScope');
     els.pageCount = $('aiPageCount');
@@ -152,6 +154,7 @@ const AIPanel = (() => {
     els.soundEnabled.checked = settings.soundEnabled;
     els.systemPrompt.value = settings.systemPrompt;
     els.pdfContext.value = settings.pdfContext;
+    els.summaryContext.value = settings.summaryContext;
     els.promptTemplate.value = settings.promptTemplate;
     els.contextScope.value = settings.contextScope;
     els.pageCount.value = settings.pageCount;
@@ -177,6 +180,7 @@ const AIPanel = (() => {
     settings.soundEnabled = els.soundEnabled.checked;
     settings.systemPrompt = els.systemPrompt.value;
     settings.pdfContext = els.pdfContext.value;
+    settings.summaryContext = els.summaryContext.value;
     settings.promptTemplate = els.promptTemplate.value;
     settings.contextScope = els.contextScope.value;
     settings.pageCount = parseInt(els.pageCount.value, 10) || 1;
@@ -210,7 +214,7 @@ const AIPanel = (() => {
     });
     // Persist on change
     [els.host, els.model, els.maxTokens, els.numCtx, els.promptTemplate,
-     els.systemPrompt, els.pdfContext, els.contextScope, els.pageCount, els.highlightCount, els.autoHowMany,
+     els.systemPrompt, els.pdfContext, els.summaryContext, els.contextScope, els.pageCount, els.highlightCount, els.autoHowMany,
      els.autoTemplate, els.mindmapLevels, els.mindmapMode, els.mindmapTemplate].forEach((el) => {
       el.addEventListener('change', collectSettings);
     });
@@ -359,6 +363,64 @@ const AIPanel = (() => {
     };
   }
 
+  /* ---------- Summary Context ($summaryContext) ---------- */
+  // Parses the Summary Context textarea into Map<page, text>.
+  // Format: '---' line, page number on the next line, then multiline text.
+  // Lines that trim to exactly '---' flush the current block; content before
+  // the first '---' is accepted when its first line is a page number; blocks
+  // whose first line is not numeric are dropped silently.
+  function parseSummaryContext(raw) {
+    const map = new Map();
+    if (!raw || !raw.trim()) return map;
+    const lines = raw.split(/\r?\n/);
+    let page = null;
+    let buf = [];
+    const flush = () => {
+      if (page != null && !map.has(page)) {
+        const text = buf.join('\n').trim();
+        if (text) map.set(page, text);
+      }
+      page = null;
+      buf = [];
+    };
+    for (const line of lines) {
+      if (line.trim() === '---') { flush(); continue; }
+      if (page == null) {
+        const n = parseInt(line, 10);
+        if (!isNaN(n)) { page = n; continue; }
+        // Non-numeric line outside a block — dropped
+        continue;
+      }
+      buf.push(line);
+    }
+    flush();
+    return map;
+  }
+
+  // One output block mirroring the input format, or '' when the page has no entry.
+  function summaryBlock(map, page) {
+    const text = map.get(page);
+    return text ? '---\n' + page + '\n' + text : '';
+  }
+
+  // Builds the $summaryContext substitution for the given request pages
+  // ([{page}]). Empty pages (selected-text scope) fall back to the current
+  // page; duplicates are skipped; pages without entries emit nothing.
+  function buildSummaryContext(map, pages) {
+    const list = pages && pages.length > 0
+      ? pages.map((p) => p.page)
+      : [(callbacks.getCurrentPage ? callbacks.getCurrentPage() : 1) || 1];
+    const out = [];
+    const seen = new Set();
+    for (const page of list) {
+      if (seen.has(page)) continue;
+      seen.add(page);
+      const block = summaryBlock(map, page);
+      if (block) out.push(block);
+    }
+    return out.join('\n');
+  }
+
   /* ---------- View mode toggle ---------- */
   function setViewMode(mode) {
     if (mode === viewMode) return;
@@ -501,11 +563,14 @@ const AIPanel = (() => {
     const pdfCtx = settings.pdfContext && settings.pdfContext.trim()
       ? settings.pdfContext.trim()
       : '';
+    const summaryMap = parseSummaryContext(settings.summaryContext);
 
     // Build one queue item per context (same prompt-building for each)
     const items = contexts.map((ctx) => {
+      const summaryCtx = buildSummaryContext(summaryMap, ctx.pages);
       const prompt = settings.promptTemplate
         .replace(/\$pdfContext/g, pdfCtx)
+        .replace(/\$summaryContext/g, () => summaryCtx)
         .replace(/\$text/g, ctx.text);
       const messages = [];
       if (settings.systemPrompt && settings.systemPrompt.trim()) {
@@ -889,9 +954,10 @@ const AIPanel = (() => {
    *   $maxLevels       — instruction for depth limit (empty when not set)
    *   $currentMindmap  — the current mindmap text to continue/complete (empty on first run)
    *   $pdfContext      — optional background context
+   *   $summaryContext  — summary entries for the iteration's pages (empty when none)
    *   $text            — the page text
    */
-  function buildMindmapPrompt(text, maxLevels, currentMindmap, pdfContext, template) {
+  function buildMindmapPrompt(text, maxLevels, currentMindmap, pdfContext, summaryCtx, template) {
     const levelsLine = maxLevels && maxLevels > 0
       ? 'Limit the mindmap to at most ' + maxLevels + ' level(s) of depth (the central topic is level 1).'
       : '';
@@ -906,6 +972,7 @@ const AIPanel = (() => {
       .replace(/\$maxLevels/g, levelsLine)
       .replace(/\$currentMindmap/g, mapLine)
       .replace(/\$pdfContext/g, ctx)
+      .replace(/\$summaryContext/g, () => summaryCtx || '')
       .replace(/\$text/g, text);
   }
 
@@ -915,13 +982,14 @@ const AIPanel = (() => {
    * - 'perPage' mode: one iteration per page, carrying the mindmap forward so
    *   each page improves on the previous one.
    * Falls back to a single iteration for selected-text or single-page ranges.
-   * Returns [{text, label}].
+   * Returns [{text, label, pages}] where pages are the iteration's page numbers.
    */
   function buildMindmapIterations(ctx, mode) {
     if (mode === 'perPage' && ctx.pages.length > 1) {
       return ctx.pages.map((pg, i) => ({
         text: pg.text,
         label: 'Page ' + pg.page + ' (' + (i + 1) + '/' + ctx.pages.length + ')',
+        pages: [pg.page],
       }));
     }
     let label;
@@ -932,7 +1000,12 @@ const AIPanel = (() => {
     } else {
       label = 'Selected text';
     }
-    return [{ text: ctx.text, label: label }];
+    const pages = [];
+    const seen = new Set();
+    ctx.pages.forEach((p) => {
+      if (!seen.has(p.page)) { seen.add(p.page); pages.push(p.page); }
+    });
+    return [{ text: ctx.text, label: label, pages: pages }];
   }
 
   async function onMindmapRun() {
@@ -948,6 +1021,7 @@ const AIPanel = (() => {
 
     const maxLevels = settings.mindmapMaxLevels ? parseInt(settings.mindmapMaxLevels, 10) : null;
     const mode = settings.mindmapMode === 'perPage' ? 'perPage' : 'all';
+    const summaryMap = parseSummaryContext(settings.summaryContext);
 
     try {
       els.mindmapStatus.textContent = I18N.t('ai.mindmapStatus.generating');
@@ -973,7 +1047,8 @@ const AIPanel = (() => {
           ? I18N.t('ai.mindmapStatus.generating') + ' ' + it.label
           : I18N.t('ai.mindmapStatus.generating');
 
-        const prompt = buildMindmapPrompt(it.text, maxLevels, currentMindmap, settings.pdfContext, settings.mindmapTemplate);
+        const prompt = buildMindmapPrompt(it.text, maxLevels, currentMindmap, settings.pdfContext,
+          buildSummaryContext(summaryMap, it.pages), settings.mindmapTemplate);
         const messages = [];
         if (settings.systemPrompt && settings.systemPrompt.trim()) {
           messages.push({ role: 'system', content: settings.systemPrompt.trim() });
@@ -1061,6 +1136,7 @@ const AIPanel = (() => {
     els.autoStop.hidden = false;
     els.autoStatus.textContent = I18N.t('auto.starting');
     const howMany = settings.howManyAnnotations ? parseInt(settings.howManyAnnotations, 10) : null;
+    const summaryMap = parseSummaryContext(settings.summaryContext);
     gatherContext().then((ctx) => {
       if (ctx.pages.length === 0 && ctx.text) {
         // selectedText mode — annotate current page
@@ -1073,6 +1149,7 @@ const AIPanel = (() => {
           includeNotes: settings.includeNotes,
           promptTemplate: settings.autoAnnotateTemplate,
           pdfContext: settings.pdfContext,
+          summaryMap,
           pages: ctx.pages,
         });
       }

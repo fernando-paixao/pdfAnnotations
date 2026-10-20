@@ -495,4 +495,34 @@ Fixed. The `hidden` attribute is now respected globally (`css/styles.css`), so:
 The show/hide logic itself was already wired in `js/ai-panel.js` (`updatePageCountVisibility`, bound to the scope's `change` event and run at load) — it just never took visual effect because `.ai-form label { display: flex }` overrode the browser's default `[hidden] { display: none }`. The new `[hidden] { display: none !important; }` rule also fixes the same latent bug elsewhere: the Export/Import/Backup/Restore group, search box, nav and zoom groups, and the namespace bar previously stayed visible before any PDF was loaded.
 ---
 Awesome, now can you show a collapsable list of the enqueued AI requests with a button to cancel that request and show details of the request if I click in one of them
+--- Future Think more about
+Can you add a $chapterContext a new variable to prompt template that will be filled with the contents from the last annotation that has this field filled
+-- #I Prefer
+Can you add a $summaryContext a new variable to prompt template that will be filled with the contents related to that page?
+
+The input will be an textarea and will receive the contents as the following:
+---
+277
+PART V: WIDENING THE CIRCLE
+---
+278
+PART V: WIDENING THE CIRCLE
+CHAPTER FOURTEEN: Dialogue and the New Economy
+---
+
+So:
+"---" separator
+$page
+Text multiline
+---
+`$summaryContext` implemented per the plan. Note: the handover's queue-list todos were already committed in "part 3" (README already documents the queue list), so no leftover work there.
+
+Changes:
+- **js/ai-panel.js** — `summaryContext: ''` setting (DEFAULT_SETTINGS, cacheEls, applySettingsToUI, collectSettings, change-persist array); new helpers after `gatherContext`: `parseSummaryContext` (CRLF-tolerant, `---`-flushed, drops non-numeric blocks, dedupes input pages), `summaryBlock`, `buildSummaryContext` (empty `pages` → current page, unique pages only). `onSend` parses the map once and each queue item substitutes only its own pages via `.replace(/\$summaryContext/g, () => summaryCtx)`. Mindmap: `buildMindmapIterations` now returns `pages` (per-segment `[pg.page]`; all-mode unique pages), `buildMindmapPrompt` takes `summaryCtx`, `onMindmapRun` parses once. `onAutoRun` passes `summaryMap` through opts.
+- **js/auto-annotate.js** — per-page `summaryBlock` built from `opts.summaryMap` at the call site; `buildPrompt` gained the `summaryBlock` param with function-form replacement.
+- **index.html** — new "Summary Context (optional)" `details.ai-subsection` after PDF Context; placeholders hint extended with `$summaryContext (page summaries)`.
+- **js/i18n.js** — 4 new keys in en + pt-BR (symmetric); `promptHintContext` period moved to HTML so the extended line reads cleanly.
+- **README.md** — Prompt Panel bullet documenting the format, the three supported templates, per-request page matching, and empty-when-unmatched.
+
+`node --check` passes on ai-panel.js, auto-annotate.js (and i18n.js). PROMPTS.md was not read or touched; default templates unchanged; manual testing left to you per the plan's validation steps.
 ---
